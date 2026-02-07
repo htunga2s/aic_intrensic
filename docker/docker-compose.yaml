@@ -10,7 +10,7 @@ services:
     networks:
       - default
   model:
-    image: ghcr.io/intrinsic-dev/aic_model
+    image: ghcr.io/intrinsic-dev/aic/aic_model
     build:
       dockerfile: docker/aic_model/Dockerfile
       context: ..
@@ -22,5 +22,19 @@ services:
       RMW_IMPLEMENTATION: rmw_zenoh_cpp
       ZENOH_CONFIG_OVERRIDE: connect/endpoints=["tcp/eval:7447"];routing/router/peers_failover_brokering=true
       ZENOH_ROUTER_CHECK_ATTEMPTS: -1
-networks:
-  default:
+
+  converter:
+    image: ghcr.io/intrinsic-dev/aic/aic_converter
+    build:
+      dockerfile: docker/aic_converter/Dockerfile
+      context: ..
+    volumes:
+      - shared-aic:/ws_aic
+    gpus: all
+    tty: true
+    networks:
+      - default
+
+# Shared volume for IsaacLab
+volumes:
+  shared-aic:
