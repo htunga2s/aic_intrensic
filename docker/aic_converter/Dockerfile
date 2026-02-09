@@ -29,7 +29,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked --mount=type=cache,t
   freeglut3-dev \
   libglu1-mesa-dev \
   mesa-common-dev \
-  python3-opengl -y && \
+  python3-opengl \
+  vim -y && \
   cd /ws_aic && \
   git clone --depth 1 -b v24.08 https://github.com/PixarAnimationStudios/OpenUSD.git && \
   export USD_PATH=/ws_aic/OpenUSD && \
@@ -49,6 +50,28 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked --mount=type=cache,t
   make
 
 COPY docker/aic_eval/zenoh_router_config.json5 /zenoh_router_config.json5
+
+RUN cat <<'EOF' > /generate_sdf.sh
+#!/bin/bash
+set -e
+# Source ws_aic
+source /ws_aic/install/setup.bash
+
+# Configure RMW Zenoh
+export RMW_IMPLEMENTATION=rmw_zenoh_cpp
+# export ZENOH_CONFIG_OVERRIDE='transport/shared_memory/enabled=true'
+ZENOH_ROUTER_CONFIG_URI=/zenoh_router_config.json5 ros2 run rmw_zenoh_cpp rmw_zenohd &
+ZENOHD_PID=\$!
+trap "kill -SIGINT -\$ZENOHD_PID" EXIT
+
+# Launch aic gazebo headless
+ros2 launch aic_bringup aic_gz_bringup.launch.py gazebo_gui:=false launch_rviz:=false
+
+# Copy SDF file in ws_aic
+cp /tmp/aic.sdf /ws_aic/aic.sdf
+EOF
+
+RUN chmod +x /generate_sdf.sh
 
 RUN cat <<'EOF' > /entrypoint.sh
 #!/bin/bash
