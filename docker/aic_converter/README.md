@@ -108,7 +108,7 @@ Start Isaac Sim and load the ```aic.usd``` file:
 isaaclab -s
 ```
 
-> [!TIPS]
+> [!TIP]
 > - After loading the USD file in the Isaac Sim, add a dome light and increase the intensity of other lights by order of 2.
 > - If the meshes are incomplete, import corresponding glb file and replace the original USD file mesh with that.
 
