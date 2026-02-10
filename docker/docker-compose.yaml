@@ -24,6 +24,7 @@ services:
       ZENOH_ROUTER_CHECK_ATTEMPTS: -1
 
   converter:
+    container_name: aic_converter
     image: ghcr.io/intrinsic-dev/aic/aic_converter
     build:
       dockerfile: docker/aic_converter/Dockerfile
