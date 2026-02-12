@@ -215,6 +215,25 @@ def launch_setup(context, *args, **kwargs):
         arguments=["fts_broadcaster", "--controller-manager", "/controller_manager"],
     )
 
+    fts_filtered_broadcaster_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["fts_filtered_broadcaster", "--controller-manager", "/controller_manager"],
+    )
+
+    fts_filter_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["fts_filter", "--controller-manager", "/controller_manager"],
+    )
+
+    delay_fts_filtered_broadcaster_spawner_start = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=fts_filter_spawner,
+            on_exit=fts_filtered_broadcaster_spawner,
+        ),
+    )
+
     aic_adapter = Node(
         package="aic_adapter",
         executable="aic_adapter",
@@ -408,6 +427,8 @@ def launch_setup(context, *args, **kwargs):
         initial_joint_controller_spawner_stopped,
         initial_joint_controller_spawner_started,
         fts_broadcaster_spawner,
+        fts_filter_spawner,
+        delay_fts_filtered_broadcaster_spawner_start,
         aic_adapter,
         gz_ip_env,
         gzserver,
