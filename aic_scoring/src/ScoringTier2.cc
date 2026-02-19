@@ -701,6 +701,9 @@ void ScoringTier2::JerkCallback(const TransformStampedMsg &_tf) {
   double v2z = (pz[2] - pz[1]) / (t2 - t1);
   double speed = std::sqrt(v2x * v2x + v2y * v2y + v2z * v2z);
 
+  // std::cerr << " v " << v1 << ", " << v2 << ", " << v3 << std::endl;
+  std::cerr << " speed " << speed << std::endl;
+
   constexpr double kVelocityThreshold = 0.01;  // m/s
   if (speed > kVelocityThreshold) {
     jt++;
