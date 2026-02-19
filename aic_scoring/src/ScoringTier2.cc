@@ -200,6 +200,7 @@ std::pair<Tier2Score, Tier3Score> ScoringTier2::ComputeScore() {
   // First pass: Process all messages to build the complete TF buffer.
   // We need both static TF (robot URDF) and dynamic TF (joint states) to
   // compute the full transform chain to the gripper.
+  RCLCPP_INFO(this->node->get_logger(), "Reading messages");
   while (bagReader.has_next()) {
     const auto msg_ptr = bagReader.read_next();
     // Debugging to make sure messages are in the bag
@@ -240,6 +241,7 @@ std::pair<Tier2Score, Tier3Score> ScoringTier2::ComputeScore() {
                   msg_ptr->topic_name.c_str());
     }
   }
+  RCLCPP_INFO(this->node->get_logger(), "Finished reading messages");
 
   // Complete the TF tree by linking world and aic_world
   // The aic_gz_bringup launch file uses a static tf broadcaster to do this
@@ -261,6 +263,7 @@ std::pair<Tier2Score, Tier3Score> ScoringTier2::ComputeScore() {
       this->EfficiencyCallback(*pose);
     }
   }
+  RCLCPP_INFO(this->node->get_logger(), "Finished calculating jerk and efficiency callbacks");
 
   this->state = State::Idle;
   tier2_score.add_category_score("trajectory jerk",
@@ -278,10 +281,14 @@ std::pair<Tier2Score, Tier3Score> ScoringTier2::ComputeScore() {
   tier2_score.add_category_score(
       "trajectory efficiency",
       this->GetTrajectoryEfficiencyScore(minPathLength));
+  RCLCPP_INFO(this->node->get_logger(), "Finished calculating efficiency");
   tier2_score.add_category_score("insertion force",
                                  this->GetInsertionForceScore());
+  RCLCPP_INFO(this->node->get_logger(), "Finished insertion force");
   tier2_score.add_category_score("contacts", this->GetContactsScore());
+  RCLCPP_INFO(this->node->get_logger(), "Finished contacts");
   tier3_score = this->ComputeTier3Score();
+  RCLCPP_INFO(this->node->get_logger(), "Finished tier 3");
   return {tier2_score, tier3_score};
 }
 
