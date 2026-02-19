@@ -23,6 +23,7 @@ from launch.actions import (
     OpaqueFunction,
     RegisterEventHandler,
     SetEnvironmentVariable,
+    Shutdown,
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.event_handlers import OnProcessExit
@@ -53,7 +54,6 @@ def launch_setup(context, *args, **kwargs):
     ur_tf_prefix = LaunchConfiguration("ur_tf_prefix")
     activate_joint_controller = LaunchConfiguration("activate_joint_controller")
     initial_joint_controller = LaunchConfiguration("initial_joint_controller")
-    spawn_admittance_controller = LaunchConfiguration("spawn_admittance_controller")
     description_file = LaunchConfiguration("description_file")
     launch_rviz = LaunchConfiguration("launch_rviz")
     rviz_config_file = LaunchConfiguration("rviz_config_file")
@@ -82,6 +82,7 @@ def launch_setup(context, *args, **kwargs):
     cable_type = LaunchConfiguration("cable_type")
     ground_truth = LaunchConfiguration("ground_truth")
     start_aic_engine = LaunchConfiguration("start_aic_engine")
+    shutdown_on_aic_engine_exit = LaunchConfiguration("shutdown_on_aic_engine_exit")
     aic_engine_config_file = LaunchConfiguration("aic_engine_config_file")
 
     gripper_initial_pos = "0.00655"
@@ -183,16 +184,12 @@ def launch_setup(context, *args, **kwargs):
         condition=IfCondition(launch_rviz),
     )
 
-    initial_joint_controllers = [initial_joint_controller]
-    if IfCondition(spawn_admittance_controller).evaluate(context):
-        initial_joint_controllers.append("admittance_controller")
-
     # There may be other controllers of the joints, but this is the initially-started one
     initial_joint_controller_spawner_started = Node(
         package="controller_manager",
         executable="spawner",
         arguments=[
-            *initial_joint_controllers,
+            initial_joint_controller,
             "--activate-as-group",
             "-c",
             "/controller_manager",
@@ -204,22 +201,12 @@ def launch_setup(context, *args, **kwargs):
         package="controller_manager",
         executable="spawner",
         arguments=[
-            *initial_joint_controllers,
+            initial_joint_controller,
             "-c",
             "/controller_manager",
             "--inactive",
         ],
         condition=UnlessCondition(activate_joint_controller),
-    )
-
-    gripper_action_controller_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=[
-            "gripper_action_controller",
-            "--controller-manager",
-            "/controller_manager",
-        ],
     )
 
     fts_broadcaster_spawner = Node(
@@ -244,6 +231,29 @@ def launch_setup(context, *args, **kwargs):
             {"config_file_path": aic_engine_config_file, "use_sim_time": True},
         ],
         condition=IfCondition(start_aic_engine),
+    )
+
+    # Event handler to shutdown launch file when aic_engine exits
+    shutdown_on_aic_engine_exit_handler = RegisterEventHandler(
+        OnProcessExit(
+            target_action=aic_engine,
+            on_exit=[
+                Shutdown(
+                    reason="aic_engine exited",
+                )
+            ],
+        ),
+        condition=IfCondition(
+            PythonExpression(
+                [
+                    "'",
+                    start_aic_engine,
+                    "' == 'true' and '",
+                    shutdown_on_aic_engine_exit,
+                    "' == 'true'",
+                ]
+            )
+        ),
     )
 
     # Task board spawning (conditional)
@@ -336,6 +346,14 @@ def launch_setup(context, *args, **kwargs):
         container_name="ros_gz_container",
         create_own_container="False",
         use_composition="True",
+        bridge_params=[
+            {
+                "qos_overrides./scoring/tf_static.publisher.durability": "transient_local",
+                "qos_overrides./scoring/tf_static.publisher.reliability": "reliable",
+                "qos_overrides./scoring/tf_static.publisher.history": "keep_last",
+                "qos_overrides./scoring/tf_static.publisher.depth": 1,
+            }
+        ],
     )
 
     ground_truth_tf_relay = Node(
@@ -344,9 +362,11 @@ def launch_setup(context, *args, **kwargs):
         name="tf_relay",
         output="screen",
         parameters=[
-            {"input_topic": "/scoring/tf"},
-            {"output_topic": "/tf"},
-            {"lazy": True},
+            {
+                "input_topic": "/scoring/tf",
+                "output_topic": "/tf",
+                "lazy": True,
+            }
         ],
         condition=IfCondition(ground_truth),
     )
@@ -357,9 +377,11 @@ def launch_setup(context, *args, **kwargs):
         name="tf_static_relay",
         output="screen",
         parameters=[
-            {"input_topic": "/scoring/tf_static"},
-            {"output_topic": "/tf_static"},
-            {"lazy": True},
+            {
+                "input_topic": "/scoring/tf_static",
+                "output_topic": "/tf_static",
+                "lazy": True,
+            }
         ],
         condition=IfCondition(ground_truth),
     )
@@ -386,7 +408,6 @@ def launch_setup(context, *args, **kwargs):
         initial_joint_controller_spawner_started,
         fts_broadcaster_spawner,
         aic_adapter,
-        gripper_action_controller_spawner,
         gz_ip_env,
         gzserver,
         gzgui,
@@ -398,6 +419,7 @@ def launch_setup(context, *args, **kwargs):
         ground_truth_tf_static_relay,
         ground_truth_static_tf_publisher,
         aic_engine,
+        shutdown_on_aic_engine_exit_handler,
     ]
 
     return nodes_to_start
@@ -480,13 +502,6 @@ def generate_launch_description():
             "initial_joint_controller",
             default_value="aic_controller",
             description="Robot controller to start.",
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            "spawn_admittance_controller",
-            default_value="false",
-            description="If true, then the admittance controller is spawned alongside the initial_joint_controller. Else, only the initial_joint_controller is spawned.",
         )
     )
     declared_arguments.append(
@@ -671,14 +686,14 @@ def generate_launch_description():
     declared_arguments.append(
         DeclareLaunchArgument(
             "cable_y",
-            default_value="0.025",
+            default_value="0.024",
             description="Cable spawn Y position",
         )
     )
     declared_arguments.append(
         DeclareLaunchArgument(
             "cable_z",
-            default_value="1.51",
+            default_value="1.518",
             description="Cable spawn Z position",
         )
     )
@@ -692,7 +707,7 @@ def generate_launch_description():
     declared_arguments.append(
         DeclareLaunchArgument(
             "cable_pitch",
-            default_value="-0.45",
+            default_value="-0.48",
             description="Cable spawn pitch orientation (radians)",
         )
     )
@@ -715,6 +730,14 @@ def generate_launch_description():
             "start_aic_engine",
             default_value="false",
             description="Whether to start the AIC engine.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "shutdown_on_aic_engine_exit",
+            default_value="false",
+            description="Whether to shutdown the launch file when aic_engine exits. "
+            "Only takes effect when start_aic_engine is true.",
         )
     )
     declared_arguments.append(
