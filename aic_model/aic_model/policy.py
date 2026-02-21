@@ -93,6 +93,21 @@ class Policy(ABC):
         This is a convenience function which populates a MotionUpdate message
         with a reasonable set of default parameters, and invokes the move_robot
         callback to request motion to the supplied pose.
+
+        The robot can be controlled in several different ways. This function
+        is intended to be the simplest way to move the arm around, by sending
+        a desired pose (position and orientation) for the gripper's
+        "tool control point" (TCP), which is the "pinch point" between the very
+        end of the gripper fingers. The rest of the control stack will take care
+        of moving all the arm's joints to so that the gripper TCP ends up in
+        the desired position and orientation.
+
+        The constants defined in this function are intended to provide
+        reasonable default behavior if the arm is unable to achieve the
+        requested pose. Different values for stiffness, damping, wrenches, and
+        so on can be used for different types of arm behavior. These values
+        are only intended to provide a starting point, and can be adjusted as
+        desired.
         """
         motion_update = MotionUpdate(
             header=Header(

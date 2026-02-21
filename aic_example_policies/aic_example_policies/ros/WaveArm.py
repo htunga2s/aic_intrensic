@@ -19,9 +19,9 @@ import numpy as np
 
 
 from aic_model.policy import (
-    Policy,
     GetObservationCallback,
     MoveRobotCallback,
+    Policy,
     SendFeedbackCallback,
 )
 from aic_control_interfaces.msg import (
