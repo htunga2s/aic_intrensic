@@ -28,7 +28,7 @@ docker compose up converter -d
 ```
 
 > [!NOTE]
-> The ```compose up``` command should create ```ghcr.io/intrinsic-dev/aic/aic_conveter``` image with **aic_shared-aic** named volume. While building the docker image, ROS2 build artifacts will be copied to named volume which will be available in IsaacLab docker.
+> The ```compose up``` command should create ```ghcr.io/intrinsic-dev/aic/aic_conveter``` image with **aic_shared-aic** named volume. While building the docker image, ROS2 build artifacts will be copied to named volume which will be available in Isaac Lab docker.
 
 > [!TIP]
 > Verfiy **aic_shared-aic** volume is present:
@@ -36,8 +36,8 @@ docker compose up converter -d
 > docker volume ls
 > ```
 
-### IsaacLab 2.3.2 Fork
-Now clone IsaacLab fork at the same directory level at ws_aic:
+### Isaac Lab 2.3.2 Fork
+Now clone Isaac Lab fork at the same directory level at ws_aic:
 ```bash
 cd ~
 git clone git@github.com:trushant05/IsaacLab.git
@@ -111,5 +111,35 @@ isaaclab -s
 > [!TIP]
 > - After loading the USD file in the Isaac Sim, add a dome light and increase the intensity of other lights by order of 2.
 > - If the meshes are incomplete, import corresponding glb file and replace the original USD file mesh with that.
+
+
+### Robot Conversion (URDF to USD)
+
+Start the ```isaac-lab-ros2``` container:
+```bash
+./docker/container.py enter ros2
+```
+
+Run the following utility script which will modify directory names:
+```bash
+find /workspace/ws_aic/src/aic/aic_assets/models -depth -type d | while read -r dir; do
+  dirpath=$(dirname "$dir")
+  basename=$(basename "$dir")
+  
+  # Notice the '-' at the end of the first string, and the extra '_' at the end of the second
+  newname=$(echo "$basename" | tr 'A-Z -' 'a-z__')
+  
+  if [ "$basename" != "$newname" ]; then
+    mv -n "$dir" "$dirpath/$newname"
+    echo "Renamed: $dir -> $dirpath/$newname"
+  fi
+done
+```
+
+Start Isaac Sim and load the ```/workspace/ws_aic/src/aic/aic_utils/isaac_aic/aic_unified_robot.urdf``` file:
+```bash
+isaaclab -s
+```
+
 
 
