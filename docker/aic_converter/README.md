@@ -9,7 +9,7 @@ Along with this docker, a named volume is created which binds ROS2 workspace bui
 
 ## Setup
 
-### AIC Repo 
+### AIC Repo
 In the home directory create ```ws_aic/src```:
 ```bash
 mkdir -p ~/ws_aic/src
@@ -21,20 +21,32 @@ cd ~/ws_aic/src
 git clone git@github.com:intrinsic-dev/aic.git -b trushant/usd_asset_generator
 ```
 
-Start ```converter``` docker compose service which will build ```ghcr.io/intrinsic-dev/aic/aic_converter``` docker image:
+Build ```ghcr.io/intrinsic-dev/aic/aic_converter``` docker image:
 ```bash
-cd aic/docker 
+cd aic/docker
+docker compose build converter
+```
+
+Start ```converter``` docker compose service which will spawn ```aic_converter``` container:
+```bash
+# Make sure you are in aic/docker directory
 docker compose up converter -d
 ```
 
 > [!NOTE]
-> The ```compose up``` command should create ```ghcr.io/intrinsic-dev/aic/aic_conveter``` image with **aic_shared-aic** named volume. While building the docker image, ROS2 build artifacts will be copied to named volume which will be available in Isaac Lab docker.
+> The ```compose up``` command should create **aic_shared-aic** named volume. When ```ghcr.io/intrinsic-dev/aic/aic_converter``` docker image is built, ROS2 build artifacts will be copied to named volume which will then be available in Isaac Lab docker.
 
 > [!TIP]
 > Verfiy **aic_shared-aic** volume is present:
 > ```bash
 > docker volume ls
 > ```
+
+After you are done, make sure to bring the **converter** service down which will also delete **aic_shared-aic** volume:
+```bash
+# Make sure you are in aic/docker directory
+docker compose down converter
+```
 
 ### Isaac Lab 2.3.2 Fork
 Now clone Isaac Lab fork at the same directory level at ws_aic:
@@ -125,7 +137,7 @@ Run the following utility script which will modify directory names:
 find /workspace/ws_aic/src/aic/aic_assets/models -depth -type d | while read -r dir; do
   dirpath=$(dirname "$dir")
   basename=$(basename "$dir")
-  
+
   # Notice the '-' at the end of the first string, and the extra '_' at the end of the second
   newname=$(echo "$basename" | tr 'A-Z -' 'a-z__')
   
@@ -136,10 +148,12 @@ find /workspace/ws_aic/src/aic/aic_assets/models -depth -type d | while read -r 
 done
 ```
 
-Start Isaac Sim and load the ```/workspace/ws_aic/src/aic/aic_utils/isaac_aic/aic_unified_robot.urdf``` file:
+Start Isaac Sim and load the ```/workspace/ws_aic/src/aic/aic_utils/aic_isaac/aic_unified_robot.urdf``` file:
 ```bash
 isaaclab -s
 ```
+
+
 
 
 
