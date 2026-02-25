@@ -21,6 +21,7 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <yaml-cpp/yaml.h>
 
+#include <Eigen/Dense>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -101,7 +102,7 @@ bool ScoringTier2::StartRecording(const std::string &_filename,
   // Subscribe to all topics relevant for scoring.
   for (const auto &topic : this->topics) {
     auto qos = topic.latched
-                   ? rclcpp::QoS(rclcpp::KeepLast(1)).transient_local()
+                   ? rclcpp::QoS(rclcpp::KeepLast(100)).transient_local()
                    : rclcpp::QoS(rclcpp::KeepLast(10)).reliable();
     auto sub = this->node->create_generic_subscription(
         topic.name, topic.type, qos,
@@ -118,7 +119,7 @@ bool ScoringTier2::StartRecording(const std::string &_filename,
               // A new cable transform was received
               this->cableTfReceived = true;
             } else if (topic.name == kTfTopic) {
-              // A new gripper  transform was received
+              // A new gripper transform was received
               this->gripperTfReceived = true;
             }
           }
@@ -139,7 +140,7 @@ bool ScoringTier2::WaitForTfs() {
   const auto timeout = std::chrono::seconds(10);
   while ((!this->cableTfReceived || !this->gripperTfReceived) &&
          this->node->get_clock()->now() - start < timeout) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
   if (!this->cableTfReceived || !this->gripperTfReceived) {
     RCLCPP_ERROR(this->node->get_logger(),
@@ -252,36 +253,32 @@ std::pair<Tier2Score, Tier3Score> ScoringTier2::ComputeScore() {
   msg.transforms.push_back(transform_stamped);
   this->TfStaticCallback(msg);
 
-  // Second pass: Compute jerk and path length for each stored timestamp.
-  // Now the TF buffer has the complete transform tree.
-  for (const auto &t : this->timestamps) {
-    auto pose = this->EndEffectorPose(t);
-    if (pose.has_value()) {
-      this->JerkCallback(*pose);
-      this->EfficiencyCallback(*pose);
-    }
-  }
-
   this->state = State::Idle;
-  tier2_score.add_category_score("trajectory jerk",
-                                 this->GetTrajectoryJerkScore());
   // Compute initial plug-port distance for trajectory efficiency scoring.
   // The robot must travel at least this distance, so it becomes the minimum
   // path length for a perfect score.
   double minPathLength = 0.0;
-  if (!this->timestamps.empty()) {
-    const auto initDist = this->GetPlugPortDistance(*this->timestamps.begin());
+  if (this->task_start_time.has_value()) {
+    const auto initDist = this->GetPlugPortDistance(tf2::TimePoint(
+        std::chrono::nanoseconds(this->task_start_time.value().nanoseconds())));
     if (initDist.has_value()) {
       minPathLength = initDist.value();
+    } else {
+      RCLCPP_WARN(this->node->get_logger(),
+                  "Failed to get initial plug port distance");
     }
   }
-  tier2_score.add_category_score(
-      "trajectory efficiency",
-      this->GetTrajectoryEfficiencyScore(minPathLength));
   tier2_score.add_category_score("insertion force",
                                  this->GetInsertionForceScore());
   tier2_score.add_category_score("contacts", this->GetContactsScore());
   tier3_score = this->ComputeTier3Score();
+  tier2_score.add_category_score("duration",
+                                 this->GetTaskDurationScore(tier3_score));
+  tier2_score.add_category_score("trajectory smoothness",
+                                 this->GetTrajectoryJerkScore(tier3_score));
+  tier2_score.add_category_score(
+      "trajectory efficiency",
+      this->GetTrajectoryEfficiencyScore(minPathLength, tier3_score));
   return {tier2_score, tier3_score};
 }
 
@@ -291,23 +288,15 @@ void ScoringTier2::Reset(const std::chrono::seconds &_buffer_size) {
   this->bagUri.clear();
   this->tf2_buffer = std::make_unique<tf2::BufferCore>(_buffer_size);
   this->state = State::Idle;
-  this->timestamps.clear();
   this->wrenches.clear();
+  this->endEffectorPoses.clear();
+  this->endEffectorVelocities.clear();
   this->task_start_time.reset();
   this->task_end_time.reset();
   this->bagWriter.close();
   this->contacts.clear();
   this->insertionPortNamespace.clear();
   this->lastTaredFt.reset();
-  // Jerk computation variables
-  this->tfHistory.clear();
-  this->linearJerk = Vector3Msg();
-  this->avgLinearJerkMagnitude = 0.0;
-  this->accumLinearJerkMagnitude = 0.0;
-  this->totalJerkTime = 0.0;
-  // Efficiency computation variables
-  this->totalPathLength = 0.0;
-  this->prevPose.reset();
 }
 
 //////////////////////////////////////////////////
@@ -394,9 +383,22 @@ void ScoringTier2::JointStateCallback(const JointStateMsg &_msg) { (void)_msg; }
 void ScoringTier2::TfCallback(const TFMsg &_msg) {
   for (const auto &tf : _msg.transforms) {
     this->tf2_buffer->setTransform(tf, "scoring", false);
-    // A bit redundant since all the messages will likely have the same
-    // timestamp
-    this->timestamps.insert(tf2::getTimestamp(tf));
+  }
+  // TODO(luca) we should find a way to only push poses if the gripper pose
+  // would have changed because of a new TF message, otherwise we might push
+  // poses that are just interpolated by the TF library.
+  // Right now, it seems the vast majority of messages under /tf are from the
+  // robot state publisher so this should be fine.
+  auto end_effector_pose = this->EndEffectorPose(tf2::TimePointZero);
+  if (end_effector_pose.has_value()) {
+    // It seems we can receive multiple different poses with the same timestamp
+    // TODO(luca) consider throttling the robot state publisher
+    if (!this->endEffectorPoses.empty() &&
+        this->endEffectorPoses.back().header.stamp ==
+            end_effector_pose.value().header.stamp) {
+      return;
+    }
+    this->endEffectorPoses.push_back(end_effector_pose.value());
   }
 }
 
@@ -447,20 +449,33 @@ void ScoringTier2::InsertionEventCallback(const StringMsg &_msg) {
 
 //////////////////////////////////////////////////
 void ScoringTier2::ControllerStateCallback(const ControllerStateMsg &_msg) {
+  auto toSeconds = [](const builtin_interfaces::msg::Time &t) {
+    return static_cast<double>(t.sec) + static_cast<double>(t.nanosec) * 1e-9;
+  };
+
   this->lastTaredFt = _msg.fts_tare_offset;
+  // Duplicated timestamp check
+  const auto stamp = toSeconds(_msg.header.stamp);
+  if (this->endEffectorVelocities.size() > 0 &&
+      this->endEffectorVelocities.back().first == stamp) {
+    return;
+  }
+  this->endEffectorVelocities.push_back({stamp, _msg.tcp_velocity.linear});
 }
 
 //////////////////////////////////////////////////
 std::optional<ScoringTier2::TransformStampedMsg> ScoringTier2::GetTransform(
     tf2::TimePoint _t, const std::string &_target_frame,
-    const std::string &_reference_frame) const {
+    const std::string &_reference_frame, bool _suppress_error) const {
   std::string error;
   if (!this->tf2_buffer->canTransform(_reference_frame, _target_frame, _t,
                                       &error)) {
-    RCLCPP_ERROR(
-        this->node->get_logger(),
-        "Transform between %s and %s not found in the tf tree, error: %s",
-        _reference_frame.c_str(), _target_frame.c_str(), error.c_str());
+    if (!_suppress_error) {
+      RCLCPP_ERROR(
+          this->node->get_logger(),
+          "Transform between %s and %s not found in the tf tree, error: %s",
+          _reference_frame.c_str(), _target_frame.c_str(), error.c_str());
+    }
     return std::nullopt;
   }
 
@@ -514,15 +529,104 @@ static double CalculateInverseProportionalScore(const double max_score,
 }
 
 //////////////////////////////////////////////////
-Tier2Score::CategoryScore ScoringTier2::GetTrajectoryJerkScore() const {
+Tier2Score::CategoryScore ScoringTier2::GetTrajectoryJerkScore(
+    const Tier3Score &_tier3) const {
   using CategoryScore = Tier2Score::CategoryScore;
 
-  const double kMaxJerkScore = 20.0;
-  const double kMinJerkScore = 1.0;
-  const double kMaxJerkValue = 25000.0;
+  const double kMaxJerkScore = 6.0;
+  const double kMinJerkScore = 0.0;
+  const double kMaxJerkValue = 50.0;
   const double kMinJerkValue = 0.0;
 
-  double jerk = this->avgLinearJerkMagnitude;
+  // Filter parameters, window size in samples. For 500 hz = 30 ms
+  static constexpr std::size_t kWindowSize = 15;
+  static constexpr std::size_t k = kWindowSize / 2;
+
+  if (!this->task_end_time.has_value()) {
+    return CategoryScore(0, "Task not completed.");
+  }
+
+  if (_tier3.total_score() <= 0) {
+    return CategoryScore(
+        0,
+        "Plug is not within max bounding radius from target port, "
+        "not assigning jerk bonus");
+  }
+
+  if (this->endEffectorVelocities.size() < kWindowSize) {
+    return CategoryScore(0.0,
+                         "Insufficient velocity samples for jerk computation.");
+  }
+
+  Eigen::MatrixXd A(kWindowSize, 3);
+  Eigen::VectorXd y_x(kWindowSize), y_y(kWindowSize), y_z(kWindowSize);
+
+  auto computeJerk = [&](const std::size_t index) {
+    const auto &data = this->endEffectorVelocities;
+    // Second order (quadratic) polynomial fit to velocity
+    // (y = c0 + c1 * dt + c2 * dt^2)
+
+    const double tCenter = data[index].first;
+
+    for (std::size_t j = 0; j < kWindowSize; ++j) {
+      const std::size_t dataIdx = index - k + j;
+      const double dt = data[dataIdx].first - tCenter;
+
+      // Vandermonde matrix
+      A(j, 0) = 1.0;
+      A(j, 1) = dt;
+      A(j, 2) = dt * dt;
+      // Target values of the polynomial function to be found
+      y_x(j) = data[dataIdx].second.x;
+      y_y(j) = data[dataIdx].second.y;
+      y_z(j) = data[dataIdx].second.z;
+    }
+
+    // Solve for the polynomial coefficients
+    auto qr = A.colPivHouseholderQr();
+    Eigen::VectorXd c_x = qr.solve(y_x);
+    Eigen::VectorXd c_y = qr.solve(y_y);
+    Eigen::VectorXd c_z = qr.solve(y_z);
+
+    // The jerk is the second derivative of the local polynomial approximation,
+    // hence 2 * c2
+    Vector3Msg ret;
+    ret.x = 2.0 * c_x(2);
+    ret.y = 2.0 * c_y(2);
+    ret.z = 2.0 * c_z(2);
+    return ret;
+  };
+
+  double totalJerkTime = 0.0;
+  double accumLinearJerkMagnitude = 0.0;
+
+  for (std::size_t i = k; i < this->endEffectorVelocities.size() - k; ++i) {
+    const auto &v = this->endEffectorVelocities[i].second;
+    constexpr double kVelocityThreshold = 0.01;
+    // Compute velocity at the central sample to gate jerk accumulation.
+    // Only accumulate jerk when the arm is actually moving, so that stillness
+    // periods don't dilute the average toward zero.
+    const double speed = std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+    if (speed <= kVelocityThreshold) {
+      continue;
+    }
+    const auto j = computeJerk(i);
+    const double jerkMag = std::sqrt(j.x * j.x + j.y * j.y + j.z * j.z);
+    const double t0 = this->endEffectorVelocities[i - k].first;
+    const double t1 = this->endEffectorVelocities[i + k].first;
+    const double dt = (t1 - t0) / kWindowSize;
+    totalJerkTime += dt;
+    accumLinearJerkMagnitude += jerkMag * dt;
+  }
+
+  if (std::abs(totalJerkTime) < 1e-6) {
+    const std::string msg =
+        "Error computing jerk. Insufficient end-effector pose samples.";
+    RCLCPP_ERROR(this->node->get_logger(), msg.c_str());
+    return CategoryScore(0.0, msg);
+  }
+
+  const double jerk = accumLinearJerkMagnitude / totalJerkTime;
 
   std::stringstream sstream;
   sstream.setf(std::ios::fixed);
@@ -537,67 +641,88 @@ Tier2Score::CategoryScore ScoringTier2::GetTrajectoryJerkScore() const {
 }
 
 //////////////////////////////////////////////////
-void ScoringTier2::EfficiencyCallback(const TransformStampedMsg &_tf) {
-  if (this->prevPose.has_value()) {
-    double dx =
-        _tf.transform.translation.x - this->prevPose->transform.translation.x;
-    double dy =
-        _tf.transform.translation.y - this->prevPose->transform.translation.y;
-    double dz =
-        _tf.transform.translation.z - this->prevPose->transform.translation.z;
-    this->totalPathLength += std::sqrt(dx * dx + dy * dy + dz * dz);
-  }
-  this->prevPose = _tf;
-}
-
-//////////////////////////////////////////////////
 Tier2Score::CategoryScore ScoringTier2::GetTrajectoryEfficiencyScore(
-    double _minPathLength) const {
+    double _minPathLength, const Tier3Score &_tier3) const {
   using CategoryScore = Tier2Score::CategoryScore;
 
+  if (!this->task_end_time.has_value()) {
+    return CategoryScore(0, "Task not completed.");
+  }
+
+  if (_tier3.total_score() <= 0) {
+    return CategoryScore(
+        0,
+        "Plug is not within max bounding radius from target port, "
+        "not assigning efficiency bonus");
+  }
+
+  double totalPathLength = 0.0;
+  for (std::size_t i = 1; i < this->endEffectorPoses.size(); ++i) {
+    const auto &tf0 = this->endEffectorPoses[i - 1].transform.translation;
+    const auto &tf1 = this->endEffectorPoses[i].transform.translation;
+    double dx = tf1.x - tf0.x;
+    double dy = tf1.y - tf0.y;
+    double dz = tf1.z - tf0.z;
+    totalPathLength += std::sqrt(dx * dx + dy * dy + dz * dz);
+  }
+
   // Score range and path length bounds (meters).
-  const double kMaxEfficiencyScore = 10.0;  // Shortest path
-  const double kMinEfficiencyScore = 0.0;   // Longest path
-  const double kMaxPathLength = 10.0;       // Path length for min score
+  const double kMaxEfficiencyScore = 6.0;              // Shortest path
+  const double kMinEfficiencyScore = 0.0;              // Longest path
+  const double kMaxPathLength = 1.0 + _minPathLength;  // Path for min score
 
   std::stringstream ss;
   ss << std::fixed << std::setprecision(2);
-  ss << "Total end-effector path length: " << this->totalPathLength << " m"
+  ss << "Total end-effector path length: " << totalPathLength << " m"
      << ", initial plug-port distance: " << _minPathLength << " m";
 
   const double score = CalculateInverseProportionalScore(
       kMaxEfficiencyScore, kMinEfficiencyScore, kMaxPathLength, _minPathLength,
-      this->totalPathLength);
+      totalPathLength);
 
   return CategoryScore(score, ss.str());
 }
 
 //////////////////////////////////////////////////
 Tier3Score ScoringTier2::GetDistanceScore() const {
-  // For now, just have the score be inversely proportional to the time
-  // it took to execute the task and the final distance between plug and port
-  // Linear interpolation in the interval, clamp to maximum and minimum
-  // Use distance as a base score, task time as a multiplier
-  const rclcpp::Duration kMaxTaskTime = rclcpp::Duration::from_seconds(60.0);
-  const rclcpp::Duration kMinTaskTime = rclcpp::Duration::from_seconds(5.0);
-  const double kFastestTaskMultiplier = 3.0;
-  const double kSlowestTaskMultiplier = 1.0;
+  // A two step approach to compute the score:
+  // * If we are in partial insertion, checked through a bounding box between
+  //   the port entrance and its end, interpolate linearly in the range.
+  // * If we are not in partial insertion, A simple distance metric,
+  //   inversely proportional to the time it took to execute the task and the
+  //   final distance between plug and port.
+  //   Linear interpolation in the interval, clamp to maximum and a bounding
+  //   sphere centered in the port tip and with radius between port entrance
+  //   and port entrance + maxDistance. The maxDistance is set to half of the
+  //   initial plug-port distance.
+  //   This score is always lower than a partial insertion score.
 
-  const double kMaxDistance = 1.0;
-  const double kMinDistance = 0.0;
-  const double kClosestTaskScore = 10.0;
-  const double kFurthestTaskScore = 0.5;
-
-  if (this->timestamps.empty()) {
-    return Tier3Score(0, "Distance computation failed, no tfs received");
+  // Being as close as possible to the port entrance will award
+  // kClosestTaskScore
+  const auto initDist = this->GetPlugPortDistance(tf2::TimePoint(
+      std::chrono::nanoseconds(this->task_start_time.value().nanoseconds())));
+  double radiusFromPort = 0.0;
+  if (initDist.has_value()) {
+    radiusFromPort = initDist.value() * 0.5;
+  } else {
+    RCLCPP_WARN(this->node->get_logger(),
+                "Failed to get initial plug port distance");
   }
 
-  if (!this->task_start_time.has_value()) {
-    return Tier3Score(0, "Time computation failed, task start time not set");
-  }
+  const double kMaxDistance = radiusFromPort;
+  const double kClosestTaskScore = 25.0;
+  const double kFurthestTaskScore = 0.0;
+
+  // Starting partial insertion will award kMinInsertionScore, linear range all
+  // the way to the end with kMaxInsertionScore.
+  const double kMinInsertionScore = 38.0;
+  const double kMaxInsertionScore = 50.0;
+  // The tolerance in x-y within the port to validate that the plug is being
+  // inserted.
+  const double kEntranceXYTol = 0.005;
 
   if (!this->task_end_time.has_value()) {
-    return Tier3Score(0, "Time computation failed, task end time not set");
+    return Tier3Score(0, "Task not completed.");
   }
 
   const auto end_time =
@@ -608,31 +733,76 @@ Tier3Score ScoringTier2::GetDistanceScore() const {
         0, "Distance computation failed, tf between cable and port not found");
   }
 
-  const rclcpp::Duration task_duration =
-      this->task_end_time.value() - this->task_start_time.value();
-  const double duration_multiplier = CalculateInverseProportionalScore(
-      kFastestTaskMultiplier, kSlowestTaskMultiplier, kMaxTaskTime.seconds(),
-      kMinTaskTime.seconds(), task_duration.seconds());
+  // Check if we are in partial insertion
+  const auto port_entrance_tf = this->GetTransform(
+      tf2::TimePoint(end_time), this->connections[0].PortEntranceTfName());
+  const auto port_tf = this->GetTransform(tf2::TimePoint(end_time),
+                                          this->connections[0].PortTfName());
+  const auto plug_tf = this->GetTransform(tf2::TimePoint(end_time),
+                                          this->connections[0].PlugTfName());
 
-  const double score =
-      duration_multiplier * CalculateInverseProportionalScore(
-                                kClosestTaskScore, kFurthestTaskScore,
-                                kMaxDistance, kMinDistance, dist.value());
+  if (!port_entrance_tf.has_value() || !port_tf.has_value() ||
+      !plug_tf.has_value()) {
+    return Tier3Score(0,
+                      "Distance computation failed, tf between plug, port and "
+                      "port entrance not found");
+  }
+
+  const auto port_entrance_trans =
+      port_entrance_tf.value().transform.translation;
+  const auto port_trans = port_tf.value().transform.translation;
+  const auto plug_trans = plug_tf.value().transform.translation;
+
+  // Used to transition smoothly between the distance scoring and the partial
+  // insertion scoring. This is the maximum distance after which no further
+  // bonus is given
+  const auto distance_threshold =
+      std::abs(port_entrance_trans.z - port_trans.z);
 
   std::stringstream sstream;
   sstream.setf(std::ios::fixed);
   sstream.precision(2);
-  sstream << "Task duration: " << task_duration.seconds()
-          << " seconds. Distance: " << dist.value() << " meters";
+
+  // A bounding box with a kEntranceXYTol x-z size, up to port_entrance.z,
+  // down until port_trans.z - a small value (for numerical tolerances)
+  if (std::abs(plug_trans.x - port_trans.x) < kEntranceXYTol &&
+      std::abs(plug_trans.y - port_trans.y) < kEntranceXYTol &&
+      plug_trans.z < port_entrance_trans.z &&
+      plug_trans.z - port_trans.z > -0.01) {
+    // We are in partial insertion, apply a bonus proportional to how far we
+    // are from the actual port
+    const double port_to_entrance_dist = port_entrance_trans.z - port_trans.z;
+    const double plug_to_port_dist = plug_trans.z - port_trans.z;
+
+    // The closest we are the higher we score
+    const double score = CalculateInverseProportionalScore(
+        kMaxInsertionScore, kMinInsertionScore, port_to_entrance_dist, 0.0,
+        plug_to_port_dist);
+    sstream << "Partial insertion detected with distance of "
+            << plug_to_port_dist << "m.";
+    return Tier3Score(score, sstream.str());
+  }
+
+  const double score = CalculateInverseProportionalScore(
+      kClosestTaskScore, kFurthestTaskScore, distance_threshold + kMaxDistance,
+      distance_threshold, dist.value());
+
+  sstream << "No insertion detected. Final plug port distance: " << dist.value()
+          << "m.";
+
   return Tier3Score(score, sstream.str());
 }
 
 //////////////////////////////////////////////////
 Tier3Score ScoringTier2::ComputeTier3Score() const {
-  constexpr double kInsertionCompletionScore = 100.0;
-  constexpr double kInsertionPenalty = -10.0;
-  Tier3Score dist_score = this->GetDistanceScore();
-  double score = dist_score.total_score();
+  // Binary will award kInsertionCompletionScore, partial insertion computed
+  // in GetDistanceScore (and up to kMaxInsertionScore)
+  constexpr double kInsertionCompletionScore = 75.0;
+  constexpr double kInsertionPenalty = -12.0;
+
+  if (!this->task_end_time.has_value()) {
+    return Tier3Score(0, "Task not completed.");
+  }
 
   // Check if insertion is completed or not
   std::stringstream sstream;
@@ -655,119 +825,21 @@ Tier3Score ScoringTier2::ComputeTier3Score() const {
       // Verify the plug is inserted into the correct target port
       if (tokens[0] == connections[0].targetModuleName &&
           tokens[1] == connections[0].portName) {
-        score += kInsertionCompletionScore;
-        sstream << "Cable insertion successful. " << dist_score.message;
+        return Tier3Score(kInsertionCompletionScore,
+                          "Cable insertion successful.");
       } else {
-        score += kInsertionPenalty;
-        sstream << "Cable insertion failed. Incorrect Port. "
-                << dist_score.message;
+        return Tier3Score(kInsertionPenalty,
+                          "Cable insertion failed. Incorrect Port.");
       }
     } else {
-      RCLCPP_ERROR(this->node->get_logger(),
-                   "Error parsing insertion port namespace: %s",
-                   this->insertionPortNamespace.c_str());
-    }
-  } else {
-    sstream << "Cable insertion failed. " << dist_score.message;
-  }
-
-  return Tier3Score(score, sstream.str());
-}
-
-//////////////////////////////////////////////////
-void ScoringTier2::JerkCallback(const TransformStampedMsg &_tf) {
-  // Debug output
-  // std::cout << "(" << _tf.transform.translation.x << " " <<
-  // _tf.transform.translation.y
-  //           << " " << _tf.transform.translation.z << ")" << std::endl;
-
-  // Helper to convert ROS time to seconds.
-  auto toSeconds = [](const builtin_interfaces::msg::Time &t) {
-    return static_cast<double>(t.sec) + static_cast<double>(t.nanosec) * 1e-9;
-  };
-
-  // Check timestamp is increasing.
-  if (!this->tfHistory.empty()) {
-    double lastTime = toSeconds(this->tfHistory.back().header.stamp);
-    double newTime = toSeconds(_tf.header.stamp);
-    if (newTime <= lastTime) {
-      return;
+      const std::string msg = "Error parsing insertion port namespace: " +
+                              this->insertionPortNamespace;
+      RCLCPP_ERROR(this->node->get_logger(), msg.c_str());
+      return Tier3Score(0.0, msg);
     }
   }
-
-  // Add tf to history.
-  this->tfHistory.push_back(_tf);
-
-  // Need 4 samples to compute jerk.
-  if (this->tfHistory.size() < 4) {
-    return;
-  }
-
-  // Keep only last 4 samples.
-  if (this->tfHistory.size() > 4) {
-    this->tfHistory.erase(this->tfHistory.begin());
-  }
-
-  // Extract timestamps.
-  double t0 = toSeconds(this->tfHistory[0].header.stamp);
-  double t1 = toSeconds(this->tfHistory[1].header.stamp);
-  double t2 = toSeconds(this->tfHistory[2].header.stamp);
-  double t3 = toSeconds(this->tfHistory[3].header.stamp);
-
-  // Extract positions.
-  double px[4], py[4], pz[4];
-  for (int i = 0; i < 4; ++i) {
-    px[i] = this->tfHistory[i].transform.translation.x;
-    py[i] = this->tfHistory[i].transform.translation.y;
-    pz[i] = this->tfHistory[i].transform.translation.z;
-  }
-
-  // Compute finite differences for jerk.
-  // v1 = (p1 - p0) / (t1 - t0), etc.
-  // a1 = (v2 - v1) / (midpoint difference)
-  // jerk = (a2 - a1) / (midpoint difference)
-  auto computeJerk = [&](const double p[4]) {
-    double v1 = (p[1] - p[0]) / (t1 - t0);
-    double v2 = (p[2] - p[1]) / (t2 - t1);
-    double v3 = (p[3] - p[2]) / (t3 - t2);
-
-    double mid_v1 = (t0 + t1) / 2.0;
-    double mid_v2 = (t1 + t2) / 2.0;
-    double mid_v3 = (t2 + t3) / 2.0;
-
-    double a1 = (v2 - v1) / (mid_v2 - mid_v1);
-    double a2 = (v3 - v2) / (mid_v3 - mid_v2);
-
-    double mid_a1 = (mid_v1 + mid_v2) / 2.0;
-    double mid_a2 = (mid_v2 + mid_v3) / 2.0;
-
-    return (a2 - a1) / (mid_a2 - mid_a1);
-  };
-
-  // Compute velocity at the central sample (v2) to gate jerk accumulation.
-  // Only accumulate jerk when the arm is actually moving, so that stillness
-  // periods don't dilute the average toward zero.
-  double v2x = (px[2] - px[1]) / (t2 - t1);
-  double v2y = (py[2] - py[1]) / (t2 - t1);
-  double v2z = (pz[2] - pz[1]) / (t2 - t1);
-  double speed = std::sqrt(v2x * v2x + v2y * v2y + v2z * v2z);
-
-  constexpr double kVelocityThreshold = 0.01;  // m/s
-  if (speed > kVelocityThreshold) {
-    // Compute linear jerk.
-    this->linearJerk.x = computeJerk(px);
-    this->linearJerk.y = computeJerk(py);
-    this->linearJerk.z = computeJerk(pz);
-
-    double jerkMag = std::sqrt(this->linearJerk.x * this->linearJerk.x +
-                               this->linearJerk.y * this->linearJerk.y +
-                               this->linearJerk.z * this->linearJerk.z);
-    double dt = (t3 - t0) / 3.0;
-    this->totalJerkTime += dt;
-    this->accumLinearJerkMagnitude += jerkMag * dt;
-    this->avgLinearJerkMagnitude =
-        this->accumLinearJerkMagnitude / this->totalJerkTime;
-  }
+  // Cable insertion was not completed, compute partial insertion
+  return this->GetDistanceScore();
 }
 
 //////////////////////////////////////////////////
@@ -779,7 +851,7 @@ std::optional<ScoringTier2::TransformStampedMsg> ScoringTier2::EndEffectorPose(
                  "Unable to compute end effector pose, gripper frame not set");
     return std::nullopt;
   }
-  return this->GetTransform(t, this->gripperFrame);
+  return this->GetTransform(t, this->gripperFrame, "aic_world", true);
 }
 
 //////////////////////////////////////////////////
@@ -788,10 +860,11 @@ Tier2Score::CategoryScore ScoringTier2::GetInsertionForceScore() const {
   // Apply a fixed penalty if excessive force is detected for more than a
   // certain time
   // The sensor reading is tared at startup so its reading is close to 0N.
-  const double kForceThreshold = 5.0;
+  const double kForceThreshold = 20.0;
   const double kDurationThreshold = 1.0;
-  const double kPenalty = -10.0;
+  const double kPenalty = -12.0;
 
+  double max_force = 0.0;
   double time_above_threshold = 0.0;
   // Start from 1 for easier dt calculation
   for (std::size_t i = 1; i < this->wrenches.size(); ++i) {
@@ -801,6 +874,7 @@ Tier2Score::CategoryScore ScoringTier2::GetInsertionForceScore() const {
       time_above_threshold +=
           this->wrenches[i].first - this->wrenches[i - 1].first;
     }
+    if (force_mag > max_force) max_force = force_mag;
   }
 
   std::string msg;
@@ -814,7 +888,7 @@ Tier2Score::CategoryScore ScoringTier2::GetInsertionForceScore() const {
   sstream.precision(2);
   sstream << "Insertion force above " << kForceThreshold
           << " N, detected for a time of " << time_above_threshold
-          << " seconds.";
+          << " seconds. Max detected force: " << max_force << "N.";
 
   if (time_above_threshold > kDurationThreshold) {
     score = kPenalty;
@@ -832,7 +906,7 @@ Tier2Score::CategoryScore ScoringTier2::GetInsertionForceScore() const {
 Tier2Score::CategoryScore ScoringTier2::GetContactsScore() const {
   using CategoryScore = Tier2Score::CategoryScore;
   // Apply a fixed penalty if any contact was detected.
-  const double kPenalty = -20.0;
+  const double kPenalty = -24.0;
   if (this->contacts.empty()) {
     return CategoryScore(0, "No contact detected.");
   }
@@ -845,6 +919,44 @@ Tier2Score::CategoryScore ScoringTier2::GetContactsScore() const {
           << contact.collision1.name << "] and [" << contact.collision2.name
           << "]. Penalty applied.";
   return CategoryScore(kPenalty, sstream.str());
+}
+
+//////////////////////////////////////////////////
+Tier2Score::CategoryScore ScoringTier2::GetTaskDurationScore(
+    const Tier3Score &_tier3) const {
+  using CategoryScore = Tier2Score::CategoryScore;
+
+  const rclcpp::Duration kMaxTaskTime = rclcpp::Duration::from_seconds(60.0);
+  const rclcpp::Duration kMinTaskTime = rclcpp::Duration::from_seconds(5.0);
+  const double kFastestTaskScore = 12.0;
+  const double kSlowestTaskScore = 0.0;
+
+  if (_tier3.total_score() <= 0) {
+    return CategoryScore(
+        0,
+        "Plug is not within max bounding radius from target port, "
+        "not assigning time bonus");
+  }
+
+  if (!this->task_start_time.has_value()) {
+    return CategoryScore(0, "Time computation failed, task start time not set");
+  }
+
+  if (!this->task_end_time.has_value()) {
+    return CategoryScore(0, "Task not completed.");
+  }
+
+  const rclcpp::Duration task_duration =
+      this->task_end_time.value() - this->task_start_time.value();
+  const double score = CalculateInverseProportionalScore(
+      kFastestTaskScore, kSlowestTaskScore, kMaxTaskTime.seconds(),
+      kMinTaskTime.seconds(), task_duration.seconds());
+
+  std::stringstream sstream;
+  sstream.setf(std::ios::fixed);
+  sstream.precision(2);
+  sstream << "Task duration: " << task_duration.seconds() << " seconds.";
+  return CategoryScore(score, sstream.str());
 }
 
 //////////////////////////////////////////////////

@@ -28,6 +28,14 @@ Building locally may be useful if you:
 
 ## Setup Instructions
 
+If your system currently has ROS 2 Kilted and Gazebo binaries installed, you must remove them before starting the source installation. This is necessary because building specific repositories from source while pre-installed binaries exist can cause environment conflicts.
+
+To purge the relevant binaries, run the following command:
+
+```bash
+sudo apt purge ros-kilted-ros2-control* ros-kilted-control* ros-kilted-kinematics* ros-kilted-joint-state-publisher ros-kilted-realtime-tools ros-kilted-gz*
+```
+
 ### 1. Add Gazebo Repository
 
 ```bash
@@ -119,7 +127,7 @@ This launches Gazebo with the robot arm and end-of-arm tooling. The `TaskBoard` 
 ### Terminal 3 - Run Your Policy
 
 ```bash
-ros2 run aic_model aic_model --ros-args -p policy:=aic_example_policies.ros.WaveArm
+ros2 run aic_model aic_model --ros-args -p use_sim_time:=true -p policy:=aic_example_policies.ros.WaveArm
 ```
 
 Replace `aic_example_policies.ros.WaveArm` with your policy implementation.
@@ -135,6 +143,7 @@ Now that you have the evaluation environment running locally:
 - Check out [`aic_example_policies/`](../aic_example_policies/) for reference implementations
 - Review [AIC Interfaces](./aic_interfaces.md) to understand available sensors and actuators
 - Consult [AIC Controller](./aic_controller.md) to learn about motion commands
+- Run the [Scoring Test Examples](./scoring_tests.md) to see expected results for each baseline policy
 
 ---
 
