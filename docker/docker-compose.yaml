@@ -30,6 +30,7 @@ services:
     build:
       dockerfile: docker/aic_converter/Dockerfile
       context: ..
+      target: ${BUILD_TARGET:-kilted_stage}
     volumes:
       - shared-aic:/ws_aic
     gpus: all
