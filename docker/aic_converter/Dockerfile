@@ -1,5 +1,5 @@
 # --- STAGE 1: AIC Workspace build with ROS 2 Kilted (Primary) ---
-FROM ros:kilted-ros-base AS kilted_stage
+FROM ros:kilted-ros-base AS aic_kilted
 
 SHELL ["/bin/bash", "-c"]
 
@@ -22,41 +22,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked --mount=type=cache,t
   rosdep install --from-paths src --ignore-src --rosdistro kilted -yr --skip-keys "gz-cmake3 DART libogre-dev libogre-next-2.3-dev" && \
   source /opt/ros/kilted/setup.bash && \
   GZ_BUILD_FROM_SOURCE=1 colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release --merge-install --executor sequential
-
-
-COPY docker/aic_eval/zenoh_router_config.json5 /zenoh_router_config.json5
-
-RUN /bin/bash -c '\
-    source /ws_aic/install/setup.bash && \
-    \
-    # 1. Configure Zenoh
-    export RMW_IMPLEMENTATION=rmw_zenoh_cpp && \
-    export ZENOH_ROUTER_CONFIG_URI=/zenoh_router_config.json5 && \
-    \
-    # 2. Start Zenoh Router in background
-    ros2 run rmw_zenoh_cpp rmw_zenohd & \
-    ZENOHD_PID=$! && \
-    \
-    # 3. Launch with timeout to allow file generation
-    # Use "timeout" to ensure the build proceeds after the file is written
-    echo "Launching Gazebo to generate SDF..." && \
-    timeout 60s ros2 launch aic_bringup aic_gz_bringup.launch.py \
-        gazebo_gui:=false \
-        launch_rviz:=false || true && \
-    \
-    # 4. Cleanup background processes
-    kill -SIGINT $ZENOHD_PID && \
-    \
-    # 5. Validation: Ensure the file actually exists before finishing the layer
-    if [ -f /tmp/aic.sdf ]; then \
-        echo "SDF successfully generated."; \
-    else \
-        echo "Error: /tmp/aic.sdf not found!" && exit 1; \
-    fi'
-
-
-# --- STAGE 2: Build gz-usd on top of AIC workspace ---
-FROM kilted_stage AS gz_usd_stage
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked --mount=type=cache,target=/var/lib/apt,sharing=locked \
   apt update && apt upgrade -y && \
@@ -84,29 +49,38 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked --mount=type=cache,t
   export GZ_VERSION=ionic && \
   cmake .. && \
   make
+ 
+COPY docker/aic_eval/zenoh_router_config.json5 /zenoh_router_config.json5
 
+RUN /bin/bash -c '\
+    source /ws_aic/install/setup.bash && \
+    \
+    # 1. Configure Zenoh
+    export RMW_IMPLEMENTATION=rmw_zenoh_cpp && \
+    export ZENOH_ROUTER_CONFIG_URI=/zenoh_router_config.json5 && \
+    \
+    # 2. Start Zenoh Router in background
+    ros2 run rmw_zenoh_cpp rmw_zenohd & \
+    ZENOHD_PID=$! && \
+    \
+    # 3. Launch with timeout to allow file generation
+    # Use "timeout" to ensure the build proceeds after the file is written
+    echo "Launching Gazebo to generate SDF..." && \
+    source /ws_aic/install/setup.bash && \
+    timeout 60s ros2 launch aic_bringup aic_gz_bringup.launch.py \
+        gazebo_gui:=false \
+        launch_rviz:=false || true && \
+    \
+    # 4. Cleanup background processes
+    kill -SIGINT $ZENOHD_PID && \
+    \
+    # 5. Validation: Ensure the file actually exists before finishing the layer
+    if [ -f /tmp/aic.sdf ]; then \
+        echo "SDF successfully generated."; \
+    else \
+        echo "Error: /tmp/aic.sdf not found!" && exit 1; \
+    fi'
 
-# RUN cat <<'EOF' > /generate_sdf.sh
-# #!/bin/bash
-# set -e
-# # Source ws_aic
-# source /ws_aic/install/setup.bash
-
-# # Configure RMW Zenoh
-# export RMW_IMPLEMENTATION=rmw_zenoh_cpp
-# # export ZENOH_CONFIG_OVERRIDE='transport/shared_memory/enabled=true'
-# ZENOH_ROUTER_CONFIG_URI=/zenoh_router_config.json5 ros2 run rmw_zenoh_cpp rmw_zenohd &
-# ZENOHD_PID=\$!
-# trap "kill -SIGINT -\$ZENOHD_PID" EXIT
-
-# # Launch aic gazebo headless
-# ros2 launch aic_bringup aic_gz_bringup.launch.py gazebo_gui:=false launch_rviz:=false
-
-# # Copy SDF file in ws_aic
-# cp /tmp/aic.sdf /ws_aic/aic.sdf
-# EOF
-
-# RUN chmod +x /generate_sdf.sh
 
 RUN cat <<'EOF' > /entrypoint.sh
 #!/bin/bash

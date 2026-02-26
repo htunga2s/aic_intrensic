@@ -8,11 +8,20 @@ DOCKER_DIR_PATH=$SCRIPT_DIR/../../docker
 
 cd $DOCKER_DIR_PATH
 
+# -- Build ws_aic
 
-# This is a flag to build entire converter
-BUILD_TARGET=kilted_stage docker compose build converter
+# ARG to build aic_converter docker image 
+# docker compose build converter
 
-docker cp $(docker create --rm ghcr.io/intrinsic-dev/aic/aic_converter):/tmp/aic.sdf ./aic.sdf
+# ARG to copy aic.sdf to build_artifacts on host
+# docker cp $(docker create --rm ghcr.io/intrinsic-dev/aic/aic_converter):/tmp/aic.sdf $SCRIPT_DIR/build_artifacts/aic.sdf
+
+
+
+
+# ARG to copy aic_world.usd to build_artifacts on host
+# docker cp $(docker create --rm ghcr.io/intrinsic-dev/aic/aic_converter):{path_to_assets_in_docker} $SCRIPT_DIR/build_artifacts/{build_files}
+
 
 # Display help function
 # function display_help {

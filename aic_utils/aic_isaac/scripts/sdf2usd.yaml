@@ -1,0 +1,6 @@
+# SDF to USD conversion
+
+remove_models:
+  - "ur5e"
+light_intensity_multiplier: 100
+fix_uri_spaces: true
