@@ -401,13 +401,21 @@ def launch_setup(context, *args, **kwargs):
         condition=IfCondition(ground_truth),
     )
 
+    delay_spawners_after_gz_spawn = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=gz_spawn_entity,
+            on_exit=[
+                joint_state_broadcaster_spawner,
+                initial_joint_controller_spawner_stopped,
+                initial_joint_controller_spawner_started,
+                fts_broadcaster_spawner,
+            ],
+        )
+    )
+
     nodes_to_start = [
         robot_state_publisher_node,
-        joint_state_broadcaster_spawner,
         delay_rviz_after_joint_state_broadcaster_spawner,
-        initial_joint_controller_spawner_stopped,
-        initial_joint_controller_spawner_started,
-        fts_broadcaster_spawner,
         aic_adapter,
         gz_ip_env,
         gzserver,
