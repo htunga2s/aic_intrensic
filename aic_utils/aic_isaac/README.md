@@ -45,21 +45,8 @@ TODO: Add instructions to run Intrinsic Isaac Lab environment
 
 ## Setup
 
-### AIC Repo
-In the home directory create ```ws_aic/src```:
-```bash
-mkdir -p ~/ws_aic/src
-```
-
-Clone aic repo in the ```src``` directory:
-```bash
-cd ~/ws_aic/src
-git clone git@github.com:intrinsic-dev/aic.git -b trushant/usd_asset_generator
-```
-
-
-### Isaac Lab 2.3.2 
-Now clone Isaac Lab the same directory level as ws_aic:
+### Isaac Lab Repo 
+Clone Isaac Lab (*version 2.3.2*) :
 ```bash
 cd ~
 git clone git@github.com:isaac-sim/IsaacLab.git
@@ -81,19 +68,32 @@ Attach ```bash``` shell to ```isaac-lab-base``` docker container:
 ./docker/container.py enter base
 ```
 
+### AIC Repo
+In the IsaacLab repository create ```ws_aic/src```:
+```bash
+mkdir -p ~/IsaacLab/ws_aic/src
+```
+
+Clone aic repo in the ```src``` directory:
+```bash
+cd ~/IsaacLab/ws_aic/src
+git clone git@github.com:intrinsic-dev/aic.git -b trushant/usd_asset_generator
+```
+
 
 ## Usage
 
 ### Generate AIC USD Assets
 
 We have provided ```aic_usd_generator.sh``` utility script which builds **aic_converter** docker and exports
-**assets** directory container following USDs at location ```aic_utils/aic_isaac/assets```:
+**assets** directory containing following USDs at location ```~/IsaacLab/ws_aic/aic/src/aic_utils/aic_isaac/assets```:
 1. World USD File (```aic_world.usda```)
 2. Enclosure USD File (```aic_enclosure.usda```)
 3. Robot USD File (```aic_robot.usda```)
 
 Generate the USDs utilizing following:
 ```bash
+cd ~/IsaacLab/ws_aic/src/aic
 ./aic_utils/aic_isaac/aic_usd_generator.sh
 ```
 
