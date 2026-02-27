@@ -7,3 +7,6 @@ files.txt
 # pixi environments
 .pixi/*
 !.pixi/config.toml
+
+# isaaclab assets
+./aic_utils/aic_isaac/assets/*
