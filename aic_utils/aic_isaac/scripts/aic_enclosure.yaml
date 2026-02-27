@@ -10,5 +10,5 @@ remove_lights:
 light_intensity_multiplier: 1000
 
 replace_meshes:
-  enclosure_visual: "enclosure_visual.usda"
-  light_visual: "light_visual.usda"
+  enclosure_visual: "./assets/staging/USDAs/enclosure_visual.usda"
+  light_visual: "./assets/staging/USDAs/light_visual.usda"

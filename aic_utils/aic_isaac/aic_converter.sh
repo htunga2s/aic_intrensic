@@ -23,7 +23,7 @@ docker compose build converter
 
 
 # ARG to copy aic_world.usd to build_artifacts on host
-# docker cp $(docker create --rm ghcr.io/intrinsic-dev/aic/aic_converter):{path_to_assets_in_docker} $SCRIPT_DIR/build_artifacts/{build_files}
+docker cp $(docker create --rm ghcr.io/intrinsic-dev/aic/aic_converter):/ws_aic/src/aic/aic_utils/aic_isaac/assets $SCRIPT_DIR/assets
 
 
 # Display help function

@@ -9,4 +9,4 @@ files.txt
 !.pixi/config.toml
 
 # isaaclab assets
-./aic_utils/aic_isaac/assets/*
+aic_utils/aic_isaac/assets/

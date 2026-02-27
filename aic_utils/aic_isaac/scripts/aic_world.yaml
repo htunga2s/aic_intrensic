@@ -2,11 +2,10 @@
 
 remove_models:
   - "ur5e"
-  - "enclosure"
-remove_lights:
-  - "enclosure_light"
 light_intensity_multiplier: 1000
 
 replace_meshes:
-  walls_visual: "walls_visual.usda"
-  floor_visual: "floor_visual.usda"
+  walls_visual: "./assets/staging/USDAs/walls_visual.usda"
+  floor_visual: "./assets/staging/USDAs/floor_visual.usda"
+  enclosure_visual: "./assets/staging/USDAs/enclosure_visual.usda"
+  light_visual: "./assets/staging/USDAs/light_visual.usda"

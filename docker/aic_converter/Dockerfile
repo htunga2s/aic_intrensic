@@ -1,12 +1,12 @@
 FROM nvcr.io/nvidia/isaac-lab:2.3.2 AS aic_isaaclab_stage
 
-COPY aic_assets/models/Enclosure/enclosure_visual.glb /workspace/isaaclab/artifacts/enclosure_visual.glb
-COPY aic_assets/models/Enclosure/light_visual.glb /workspace/isaaclab/artifacts/light_visual.glb
-COPY aic_assets/models/Floor/floor_visual.glb /workspace/isaaclab/artifacts/floor_visual.glb
-COPY aic_assets/models/Floor/walls_visual.glb /workspace/isaaclab/artifacts/walls_visual.glb
+COPY aic_assets/models/Enclosure/enclosure_visual.glb /workspace/isaaclab/assets/enclosure_visual.glb
+COPY aic_assets/models/Enclosure/light_visual.glb /workspace/isaaclab/assets/light_visual.glb
+COPY aic_assets/models/Floor/floor_visual.glb /workspace/isaaclab/assets/floor_visual.glb
+COPY aic_assets/models/Floor/walls_visual.glb /workspace/isaaclab/assets/walls_visual.glb
 
 RUN set -euo pipefail && \
-    cd /workspace/isaaclab/artifacts && \
+    cd /workspace/isaaclab/assets && \
     for in_file in *.glb */*.glb; do \
       [ -e "$in_file" ] || continue; \
       out_file="${in_file%.glb}.usd"; \
@@ -22,8 +22,9 @@ RUN set -euo pipefail && \
 # --- STAGE 1: AIC Workspace build with ROS 2 Kilted (Primary) ---
 FROM ros:kilted-ros-base AS aic_kilted
 
-# Copy build artifacts from aic_isaaclab_stage
-COPY --from=aic_isaaclab_stage /workspace/isaaclab/artifacts /ws_aic/src/aic/aic_utils/aic_isaac/assets/staging/USDs
+# Copy build assets from aic_isaaclab_stage
+COPY --from=aic_isaaclab_stage /workspace/isaaclab/assets /ws_aic/src/aic/aic_utils/aic_isaac/assets/staging/USDs
+COPY --from=aic_isaaclab_stage /workspace/isaaclab/assets/textures /ws_aic/src/aic/aic_utils/aic_isaac/assets/textures
 
 SHELL ["/bin/bash", "-c"]
 
@@ -126,21 +127,21 @@ RUN  python3 ./scripts/filter_sdf.py ./assets/staging/SDFs/aic_raw.sdf ./scripts
 
 # Convert SDFs to USDs
 RUN  source /ws_aic/install/setup.bash && \
-  /ws_aic/gz-usd/build/bin/sdf2usd ./assets/SDFs/aic_world.sdf ./assets/USDs/aic_world.usd && \
-  /ws_aic/gz-usd/build/bin/sdf2usd ./assets/SDFs/aic_enclosure.sdf ./assets/USDs/aic_enclosure.usd 
+  /ws_aic/gz-usd/build/bin/sdf2usd ./assets/staging/SDFs/aic_world.sdf ./assets/staging/USDs/aic_world.usd && \
+  /ws_aic/gz-usd/build/bin/sdf2usd ./assets/staging/SDFs/aic_enclosure.sdf ./assets/staging/USDs/aic_enclosure.usd 
 
 # Convert USDs to USDAs
 RUN  mkdir -p ./assets/staging/USDAs && \
-  /ws_aic/OpenUSD/bin/usdcat ./assets/USDs/aic_world.usd -o ./assets/USDAs/aic_world.usda && \
-  /ws_aic/OpenUSD/bin/usdcat ./assets/USDs/aic_enclosure.usd -o ./assets/USDAs/aic_enclosure.usda  && \
-  /ws_aic/OpenUSD/bin/usdcat ./assets/USDs/floor_visual.usd -o ./assets/USDAs/floor_visual.usda  && \
-  /ws_aic/OpenUSD/bin/usdcat ./assets/USDs/walls_visual.usd -o ./assets/USDAs/walls_visual.usda  && \
-  /ws_aic/OpenUSD/bin/usdcat ./assets/USDs/light_visual.usd -o ./assets/USDAs/light_visual.usda  && \
-  /ws_aic/OpenUSD/bin/usdcat ./assets/USDs/enclosure_visual.usd -o ./assets/USDAs/enclosure_visual.usda  
+  /ws_aic/OpenUSD/bin/usdcat ./assets/staging/USDs/aic_world.usd -o ./assets/staging/USDAs/aic_world.usda && \
+  /ws_aic/OpenUSD/bin/usdcat ./assets/staging/USDs/aic_enclosure.usd -o ./assets/staging/USDAs/aic_enclosure.usda  && \
+  /ws_aic/OpenUSD/bin/usdcat ./assets/staging/USDs/floor_visual.usd -o ./assets/staging/USDAs/floor_visual.usda  && \
+  /ws_aic/OpenUSD/bin/usdcat ./assets/staging/USDs/walls_visual.usd -o ./assets/staging/USDAs/walls_visual.usda  && \
+  /ws_aic/OpenUSD/bin/usdcat ./assets/staging/USDs/light_visual.usd -o ./assets/staging/USDAs/light_visual.usda  && \
+  /ws_aic/OpenUSD/bin/usdcat ./assets/staging/USDs/enclosure_visual.usd -o ./assets/staging/USDAs/enclosure_visual.usda  
 
 # Apply USDA injector
-RUN python3 ./scripts/patch_usda.py /ws_aic/assets/staging/USDAs/aic_world.usda /ws_aic/assets/aic_world.usda && \
-  python3 ./scripts/patch_usda.py /ws_aic/assets/staging/USDAs/aic_enclosure.usda /ws_aic/assets/aic_enclosure.usda
+RUN python3 ./scripts/patch_usda.py ./assets/staging/USDAs/aic_world.usda ./scripts/aic_world.yaml ./assets/aic_world.usda && \
+  python3 ./scripts/patch_usda.py ./assets/staging/USDAs/aic_enclosure.usda ./scripts/aic_enclosure.yaml ./assets/aic_enclosure.usda
 
 # Convert final USDAs to USDz
 
