@@ -2,7 +2,7 @@
 
 remove_models:
   - "ur5e"
-light_intensity_multiplier: 1000
+light_intensity_multiplier: 100
 
 replace_meshes:
   walls_visual: "./assets/staging/USDAs/walls_visual.usda"
@@ -11,3 +11,4 @@ replace_meshes:
   light_visual: "./assets/staging/USDAs/light_visual.usda"
 
 add_spot_light: true
+dome_light_radius: 12.0

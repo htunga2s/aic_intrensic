@@ -1,5 +1,5 @@
-# --- STAGE 1: AIC Workspace build with ROS 2 Kilted (Primary) ---
-FROM nvcr.io/nvidia/isaac-lab:2.3.2 AS aic_isaaclab_stage
+# --- STAGE 1: IsaacLab ---
+FROM nvcr.io/nvidia/isaac-lab:2.3.2 AS aic_isaaclab
 
 COPY aic_assets/models/Enclosure/enclosure_visual.glb /workspace/isaaclab/assets/enclosure_visual.glb
 COPY aic_assets/models/Enclosure/light_visual.glb /workspace/isaaclab/assets/light_visual.glb
@@ -20,12 +20,12 @@ RUN set -euo pipefail && \
     rm *.glb
 
 
-# --- STAGE 2: AIC Workspace build with ROS 2 Kilted (Secondary) ---
+# --- STAGE 2: ROS 2 Kilted for aic_ws and gz-usd ---
 FROM ros:kilted-ros-base AS aic_kilted
 
 # Copy build assets from aic_isaaclab_stage
-COPY --from=aic_isaaclab_stage /workspace/isaaclab/assets /ws_aic/src/aic/aic_utils/aic_isaac/assets/staging/USDs
-COPY --from=aic_isaaclab_stage /workspace/isaaclab/assets/textures /ws_aic/src/aic/aic_utils/aic_isaac/assets/textures
+COPY --from=aic_isaaclab /workspace/isaaclab/assets /ws_aic/src/aic/aic_utils/aic_isaac/assets/staging/USDs
+COPY --from=aic_isaaclab /workspace/isaaclab/assets/textures /ws_aic/src/aic/aic_utils/aic_isaac/assets/textures
 
 SHELL ["/bin/bash", "-c"]
 
@@ -123,8 +123,8 @@ RUN mkdir -p ./assets/staging/SDFs && \
   cp /tmp/aic.sdf ./assets/staging/SDFs/aic_raw.sdf
 
 # Apply fitler rules to SDFs
-RUN  python3 ./scripts/filter_sdf.py ./assets/staging/SDFs/aic_raw.sdf ./scripts/aic_world.yaml ./assets/staging/SDFs/aic_world.sdf && \
- python3 ./scripts/filter_sdf.py ./assets/staging/SDFs/aic_raw.sdf ./scripts/aic_enclosure.yaml ./assets/staging/SDFs/aic_enclosure.sdf
+RUN  python3 ./scripts/filter_sdf.py ./assets/staging/SDFs/aic_raw.sdf ./config/aic_world.yaml ./assets/staging/SDFs/aic_world.sdf && \
+ python3 ./scripts/filter_sdf.py ./assets/staging/SDFs/aic_raw.sdf ./config/aic_enclosure.yaml ./assets/staging/SDFs/aic_enclosure.sdf
 
 # Convert SDFs to USDs
 RUN  source /ws_aic/install/setup.bash && \
@@ -141,10 +141,28 @@ RUN  mkdir -p ./assets/staging/USDAs && \
   /ws_aic/OpenUSD/bin/usdcat ./assets/staging/USDs/enclosure_visual.usd -o ./assets/staging/USDAs/enclosure_visual.usda  
 
 # Apply USDA injector
-RUN python3 ./scripts/patch_usda.py ./assets/staging/USDAs/aic_world.usda ./scripts/aic_world.yaml ./assets/aic_world.usda && \
-  python3 ./scripts/patch_usda.py ./assets/staging/USDAs/aic_enclosure.usda ./scripts/aic_enclosure.yaml ./assets/aic_enclosure.usda
+RUN python3 ./scripts/patch_usda.py ./assets/staging/USDAs/aic_world.usda ./config/aic_world.yaml ./assets/aic_world.usda && \
+  python3 ./scripts/patch_usda.py ./assets/staging/USDAs/aic_enclosure.usda ./config/aic_enclosure.yaml ./assets/aic_enclosure.usda
 
 # Convert final USDAs to USDz
+
+
+# # --- STAGE 3: Final image ---
+# FROM aic_isaaclab_stage AS aic_urdf
+
+# # Copy assets from aic_kilted
+# # COPY --from=aic_kilted /ws_aic /ws_aic
+
+# WORKDIR /workspace/isaaclab
+
+
+# # --- STAGE 4: Final image ---
+# FROM aic_kilted AS aic_gz_usd
+
+# # Copy assets from aic_urdf
+# # COPY --from=aic_urdf /ws_aic /ws_aic
+
+# WORKDIR /ws_aic/src/aic/aic_utils/aic_isaac
 
 RUN cat <<'EOF' > /entrypoint.sh
 #!/bin/bash
@@ -157,4 +175,3 @@ RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash"]
-

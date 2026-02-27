@@ -4,7 +4,7 @@ from pxr import Usd, Sdf
 
 def modify_usda(usda_path, config_path, output_path):
     # 1. Load the Configuration
-    with open(config_path, 'r') as f:
+    with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
     # 2. Parse the USD for querying (Stage)
@@ -15,7 +15,7 @@ def modify_usda(usda_path, config_path, output_path):
 
     # --- RULE 1: Find Target Paths ---
     # We expect the YAML to have a dictionary map called 'replace_meshes'
-    replacements = config.get('replace_meshes', {})
+    replacements = config.get("replace_meshes", {})
     target_names = list(replacements.keys())
     found_paths = {}
 
@@ -36,7 +36,9 @@ def modify_usda(usda_path, config_path, output_path):
     # --- RULE 2: Replace Meshes ---
     for target_name, mesh_file in replacements.items():
         if target_name not in found_paths:
-            print(f"Warning: Could not find '{target_name}' in {usda_path}. Skipping.")
+            print(
+                f"Warning: Could not find '{target_name}' in {usda_path}. Skipping."
+            )
             continue
 
         usd_target_path = found_paths[target_name]
@@ -62,6 +64,25 @@ def modify_usda(usda_path, config_path, output_path):
         Sdf.CopySpec(mesh_layer, src_path, main_layer, dst_path)
         print(f"Injected new mesh from {mesh_file} into {usd_target_path}")
 
+    # --- RULE 3: Set dome light radius (if it exists) ---
+    dome_light_radius = config.get("dome_light_radius")
+    if dome_light_radius is not None:
+        dome_light_prim = None
+        # Traverse the stage to find the dome light by its name
+        for prim in stage.Traverse():
+            if prim.GetName() == "dome_light":
+                dome_light_prim = prim
+                break
+
+        if dome_light_prim:
+            # The prim is a UsdLux.Light. We need to set its radius.
+            radius_attr = dome_light_prim.GetAttribute("inputs:radius")
+            if radius_attr:
+                radius_attr.Set(float(dome_light_radius))
+                print(f"Set 'inputs:radius' of '{dome_light_prim.GetName()}' to {dome_light_radius}")
+        else:
+            print("Warning: 'dome_light' not found in the stage.")
+
     # 4. Save the Modified USD
     main_layer.Export(output_path)
     print(f"Modified USD saved to {output_path}")
@@ -69,7 +90,9 @@ def modify_usda(usda_path, config_path, output_path):
 if __name__ == "__main__":
     # Example usage: python3 usda_modifier.py aic_enclosure.usda config.yaml aic_enclosure_updated.usda
     if len(sys.argv) != 4:
-        print("Usage: python3 usda_modifier.py <input.usda> <config.yaml> <output.usda>")
+        print(
+            "Usage: python3 usda_modifier.py <input.usda> <config.yaml> <output.usda>"
+        )
         sys.exit(1)
-    
+
     modify_usda(sys.argv[1], sys.argv[2], sys.argv[3])
