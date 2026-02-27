@@ -12,3 +12,5 @@ light_intensity_multiplier: 1000
 replace_meshes:
   enclosure_visual: "./assets/staging/USDAs/enclosure_visual.usda"
   light_visual: "./assets/staging/USDAs/light_visual.usda"
+
+add_spot_light: true

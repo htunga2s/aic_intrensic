@@ -9,3 +9,5 @@ replace_meshes:
   floor_visual: "./assets/staging/USDAs/floor_visual.usda"
   enclosure_visual: "./assets/staging/USDAs/enclosure_visual.usda"
   light_visual: "./assets/staging/USDAs/light_visual.usda"
+
+add_spot_light: true

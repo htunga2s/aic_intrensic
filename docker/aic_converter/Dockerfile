@@ -1,3 +1,4 @@
+# --- STAGE 1: AIC Workspace build with ROS 2 Kilted (Primary) ---
 FROM nvcr.io/nvidia/isaac-lab:2.3.2 AS aic_isaaclab_stage
 
 COPY aic_assets/models/Enclosure/enclosure_visual.glb /workspace/isaaclab/assets/enclosure_visual.glb
@@ -19,7 +20,7 @@ RUN set -euo pipefail && \
     rm *.glb
 
 
-# --- STAGE 1: AIC Workspace build with ROS 2 Kilted (Primary) ---
+# --- STAGE 2: AIC Workspace build with ROS 2 Kilted (Secondary) ---
 FROM ros:kilted-ros-base AS aic_kilted
 
 # Copy build assets from aic_isaaclab_stage

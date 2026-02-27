@@ -46,6 +46,38 @@ def modify_sdf(sdf_path, config_path, output_path):
                 intensity_tag.text = f"{new_val:.2f}"
                 print(f"Updated light '{light.get('name')}' intensity to {intensity_tag.text}")
 
+        # --- RULE: Add overhead spot light (z=12, radius≈12) ---
+    add_spot = config.get("add_spot_light", False)
+    if add_spot:
+        spot_light = ET.SubElement(world, "light", attrib={
+            "name": "dome_substitute",
+            "type": "spot",
+        })
+
+        pose = ET.SubElement(spot_light, "pose")
+        pose.text = "0 0 12 0 0 0"
+
+        direction = ET.SubElement(spot_light, "direction")
+        direction.text = "0 0 -1"
+
+        intensity = ET.SubElement(spot_light, "intensity")
+        intensity.text = "1.0"
+
+        diffuse = ET.SubElement(spot_light, "diffuse")
+        diffuse.text = "1 1 1 1"
+
+        specular = ET.SubElement(spot_light, "specular")
+        specular.text = "0.1 0.1 0.1 1"
+
+        spot = ET.SubElement(spot_light, "spot")
+        inner = ET.SubElement(spot, "inner_angle")
+        inner.text = "0.8"      # ~46 degrees
+        outer = ET.SubElement(spot, "outer_angle")
+        outer.text = "1.57"     # ~90 degrees, radius≈12 at z=12
+        falloff = ET.SubElement(spot, "falloff")
+        falloff.text = "1"
+
+        print("Added overhead spot light 'dome_substitute'")
 
     # 3. Save the Modified SDF
     tree.write(output_path, encoding='utf-8', xml_declaration=True)
