@@ -11,7 +11,7 @@ def modify_sdf(sdf_path, config_path, output_path):
     # 2. Parse the SDF (XML)
     tree = ET.parse(sdf_path)
     root = tree.getroot()
-    world = root.find('world')
+    world = root.find("world")
 
     # --- RULE 1: Remove Specific Models ---
     if world is not None:
@@ -28,7 +28,7 @@ def modify_sdf(sdf_path, config_path, output_path):
             if light.get("name") in lights_to_remove:
                 world.remove(light)
                 print(f"Removed light: {light.get('name')}")
-        
+
         # --- RULE 3: Add overhead spot light (z=12, radius≈12) ---
         add_spot = config.get("add_spot_light", False)
         if add_spot:
@@ -85,9 +85,8 @@ def modify_sdf(sdf_path, config_path, output_path):
                         f" '{light.get('name')}' intensity to {intensity_tag.text}"
                     )
 
-       
     # 3. Save the Modified SDF
-    tree.write(output_path, encoding='utf-8', xml_declaration=True)
+    tree.write(output_path, encoding="utf-8", xml_declaration=True)
     print(f"Modified SDF saved to: {output_path}")
 
 

@@ -2,6 +2,7 @@ import yaml
 import sys
 from pxr import Usd, Sdf
 
+
 def modify_usda(usda_path, config_path, output_path):
     # 1. Load the Configuration
     with open(config_path, "r") as f:
@@ -36,13 +37,11 @@ def modify_usda(usda_path, config_path, output_path):
     # --- RULE 2: Replace Meshes ---
     for target_name, mesh_file in replacements.items():
         if target_name not in found_paths:
-            print(
-                f"Warning: Could not find '{target_name}' in {usda_path}. Skipping."
-            )
+            print(f"Warning: Could not find '{target_name}' in {usda_path}. Skipping.")
             continue
 
         usd_target_path = found_paths[target_name]
-        
+
         # Form Sdf.Path objects
         dst_path = Sdf.Path(usd_target_path)
         src_path = Sdf.Path(f"/{target_name}")
@@ -79,13 +78,16 @@ def modify_usda(usda_path, config_path, output_path):
             radius_attr = dome_light_prim.GetAttribute("inputs:radius")
             if radius_attr:
                 radius_attr.Set(float(dome_light_radius))
-                print(f"Set 'inputs:radius' of '{dome_light_prim.GetName()}' to {dome_light_radius}")
+                print(
+                    f"Set 'inputs:radius' of '{dome_light_prim.GetName()}' to {dome_light_radius}"
+                )
         else:
             print("Warning: 'dome_light' not found in the stage.")
 
     # 4. Save the Modified USD
     main_layer.Export(output_path)
     print(f"Modified USD saved to {output_path}")
+
 
 if __name__ == "__main__":
     # Example usage: python3 usda_modifier.py aic_enclosure.usda config.yaml aic_enclosure_updated.usda
