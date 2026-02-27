@@ -187,7 +187,7 @@ class Engine {
   ~Engine();
 
   /// \brief Start the engine.
-  void start();
+  EngineState start();
 
  private:
   // Initializes the engine.
@@ -297,6 +297,11 @@ class Engine {
   /// @return True if shutdown succeeded, false otherwise.
   bool shutdown_model_node();
 
+  /// @brief Validate that the model is behaving as expected in shutdown state
+  /// (i.e. it has no robot command publishers).
+  /// @return True if model passed shutdown validation, false otherwise.
+  bool validate_model_shutdown() const;
+
   /// @brief Stop the bag recording and score the current trial
   /// @param[in] A reference to the current trial score to update.
   void score_trial(TrialScore& trial);
@@ -304,6 +309,24 @@ class Engine {
   /// @brief Scores the current run, writing its result to a YAML file.
   /// \param[in] The score to serialize and write.
   void score_run(const Score& score);
+
+  /// @brief Wait for a future, interrupt if rclcpp Context is shut down.
+  /// \param[in] The future to wait for.
+  /// \param[in] The timeout to wait until.
+  /// @return true if the future resolved, false if it didn't.
+  template <typename FutureT>
+  bool wait_for_interruptible(const FutureT& future,
+                              const std::chrono::seconds timeout) const {
+    const auto start = node_->now();
+    const auto timeout_duration = rclcpp::Duration(timeout);
+    while (rclcpp::ok() && (node_->now() - start) < timeout_duration) {
+      if (future.wait_for(std::chrono::milliseconds(50)) ==
+          std::future_status::ready) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   // Strings.
   // Name of the aic_adapter node for lifecycle transitions.

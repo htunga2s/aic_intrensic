@@ -11,11 +11,13 @@ Welcome to the **AI for Industry Challenge**. This document outlines the technic
 
 ## 1. Prepare and Build Your Image
 
-All submissions must be containerized using OCI-compliant image builder like Docker or Podman. Organize your project by placing all model logic and dependency requirements directly within the `aic_model` directory.
+All submissions must be containerized using OCI-compliant image builder like Docker or Podman. Organize your project by placing all policy logic and dependency requirements directly within your custom policy package.
+
+If you don't have any additional packages or dependencies, you can keep your policy code in the re-use the `aic_model` directory with its [Dockerfile](../docker/aic_model/Dockerfile). In this case, simply go to the `docker-compose.yaml`, update the `command: --ros-args -p policy:=aic_example_policies.ros.WaveArm` to `command: --ros-args -p policy:=aic_model.MyPolicy`, and skip to the [Build the Image](#build-the-image) section.
 
 ### Customize Your Dockerfile (Optional)
 
-If you need to add custom packages or dependencies, you can create a custom Dockerfile:
+If you need to add custom packages or dependencies, place your policy code in a new package and create a custom Dockerfile based on the provided [Dockerfile](../docker/aic_model/Dockerfile):
 
 ```bash
 mkdir -p docker/my_policy
@@ -29,13 +31,35 @@ Then modify `docker/my_policy/Dockerfile` to add your custom policy package:
 COPY my_policy_node /ws_aic/src/aic/my_policy_node
 ```
 
-If your policy requires additional Python packages, add them to `pixi.toml`:
+In particular, if your policy requires additional **Python** packages, add them to `pixi.toml`:
 
 ```toml
 [dependencies]
 # ... existing dependencies ...
 torch = ">=2.0.0"
 numpy = ">=1.24.0"
+```
+
+Open `docker/my_policy/Dockerfile` and add your policy node to the build instructions:
+
+```dockerfile
+# Add other local dependencies
+COPY my_policy_node /ws_aic/src/aic/my_policy_node # <-- Add this line
+```
+
+### Update `docker-compose.yaml`
+
+Docker combines the `ENTRYPOINT` from the Dockerfile (`pixi run --as-is ros2 run aic_model aic_model`) and the `command` from the Compose file (e.g. `--ros-args -p policy:=aic_example_policies.ros.WaveArm`).
+
+Open `docker/docker-compose.yaml` and update the model service configuration to use your Dockerfile and policy:
+
+```yaml
+	model:
+		image: localhost/aic/aic_model
+		build:
+			dockerfile: docker/my_policy_node/Dockerfile # <-- replace this line
+			context: ..
+		command: --ros-args -p policy:=my_policy_node.MyPolicy # <-- and this line
 ```
 
 ### Build the Image
@@ -56,7 +80,7 @@ docker build -t my-solution:v1 -f docker/my_policy/Dockerfile .
 
 Before pushing your image to our servers, you must verify that the container initializes correctly and handles data as expected.
 
-You can run the evaluation locally using docker compose:
+You can run the evaluation locally using `docker compose`:
 
 ```bash
 docker compose -f docker/docker-compose.yaml up
@@ -135,6 +159,32 @@ Simply pushing the image to ECR does not trigger the evaluation. You must notify
 3. Click on the `AI for Industry Challenge` and then go to `Submit`.
 4. Select the `Qualification` phase and paste the URI into the submission `OCI Image` field.
 5. Click `Submit` to proceed.
+
+---
+
+### 4. Monitor Your Evaluation
+
+After registering your OCI Image URI, our orchestration platform spins up your container into a dedicated, isolated evaluation environment. This process is automated, but you can track its lifecycle through the portal's monitoring dashboard.
+
+#### Accessing the Dashboard
+1. Navigate to the **My Submissions** page in the portal.
+2. Apply the `Qualification` filter to the "Phase" dropdown to see your current entries.
+3. Locate your most recent submission at the top of the table.
+
+#### Evaluation Lifecycle
+
+The **Status** column provides a real-time status of your container's journey through our evaluation cluster. Understanding these states is key to managing your daily submission limit.
+
+| Status | Technical Context |
+| :--- | :--- |
+| **Submitted** | The platform has received your Image URI. |
+| **Queued** | Your submission is in the execution buffer. It is waiting for an available evaluation node in the cluster. |
+| **Running** | Your image has been pulled from ECR, and the ROS 2 nodes are currently executing the challenge logic in the simulation environment. |
+| **Finished** | The evaluation reached a natural conclusion. Your success metrics have been calculated and are now visible on the Leaderboard. |
+| **Failed** | The container exited prematurely. This usually indicates a runtime crash (e.g., Python `ImportError`), a missing dependency, or a system timeout. |
+
+> [!TIP]
+> Depending on cluster load and the complexity of your policy, the transition from **Queued** to **Finished** typically takes **5 to 15 minutes**. You do not need to resubmit if the status is "Queued" or "Running"; simply refresh the page to see the latest state.
 
 ---
 
