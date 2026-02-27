@@ -22,8 +22,15 @@ def modify_sdf(sdf_path, config_path, output_path):
         if model.get('name') in models_to_remove:
             world.remove(model)
             print(f"Removed model: {model.get('name')}")
+    
+    # --- RULE 2: Remove Lights ---
+    lights_to_remove = config.get('remove_lights', [])
+    for light in world.findall('light'):
+        if light.get('name') in lights_to_remove:
+            world.remove(light)
+            print(f"Removed light: {light.get('name')}")
 
-    # --- RULE 2: Adjust Light Intensity ---
+    # --- RULE 3: Adjust Light Intensity ---
     intensity_multiplier = config.get('light_intensity_multiplier', 1.0)
     if intensity_multiplier != 1.0:
         for light in world.findall('light'):
@@ -39,27 +46,15 @@ def modify_sdf(sdf_path, config_path, output_path):
                 intensity_tag.text = f"{new_val:.2f}"
                 print(f"Updated light '{light.get('name')}' intensity to {intensity_tag.text}")
 
-    # --- RULE 3: Convert .glb to .dae in URIs ---
-    if config.get('convert_glb_to_dae', True):
-        # root.iter('uri') finds <uri> tags anywhere in the entire XML tree
-        for uri in root.iter('uri'):
-            # Check if the tag has text and if it ends with the target extension
-            if uri.text and uri.text.endswith('.glb'):
-                old_text = uri.text
-            
-                # Replace the extension safely
-                uri.text = old_text.replace('.glb', '.dae')
-            
-                print(f"Updated URI extension: {old_text} -> {uri.text}")
 
     # 3. Save the Modified SDF
     tree.write(output_path, encoding='utf-8', xml_declaration=True)
     print(f"Modified SDF saved to {output_path}")
 
 if __name__ == "__main__":
-    # Example usage: python3 sdf_modifier.py /tmp/aic.sdf config.yaml /tmp/aic_modified.sdf
+    # Example usage: python3 filter_sdf.py /tmp/aic.sdf config.yaml /tmp/aic_modified.sdf
     if len(sys.argv) != 4:
-        print("Usage: python3 sdf_modifier.py <input.sdf> <config.yaml> <output.sdf>")
+        print("Usage: python3 filter_sdf.py <input.sdf> <config.yaml> <output.sdf>")
         sys.exit(1)
     
     modify_sdf(sys.argv[1], sys.argv[2], sys.argv[3])

@@ -1,0 +1,14 @@
+# SDF to USD conversion
+
+remove_models:
+  - "ur5e"
+  - "enclosure walls"
+  - "floor"
+remove_lights:
+  - "ceiling_01"
+  - "ceiling_02"
+light_intensity_multiplier: 1000
+
+replace_meshes:
+  enclosure_visual: "enclosure_visual.usda"
+  light_visual: "light_visual.usda"
