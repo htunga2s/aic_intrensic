@@ -147,10 +147,13 @@ RUN python3 ./scripts/patch_usda.py ./assets/staging/USDAs/aic_world.usda ./conf
 # Generate Robot URDF
 RUN mkdir -p ./assets/staging/URDFs && \
   source /ws_aic/install/setup.bash && \
-  ros2 run xacro xacro /ws_aic/src/aic/aic_description/urdf/ur_gz.urdf.xacro -o ./assets/staging/URDFs/aic_robot.urdf name:=ur
+  ros2 run xacro xacro /ws_aic/src/aic/aic_description/urdf/ur_gz.urdf.xacro -o ./assets/staging/URDFs/aic_robot_raw.urdf name:=ur
+
+# Apply filter rules to URDF
+RUN python3 ./scripts/filter_urdf.py ./assets/staging/URDFs/aic_robot_raw.urdf ./config/aic_robot.yaml ./assets/staging/URDFs/aic_robot.urdf
 
 
-# # --- STAGE 3: Final image ---
+# --- STAGE 3: Final image ---
 FROM aic_isaaclab AS aic_urdf
 
 # Copy assets from aic_kilted
@@ -158,19 +161,26 @@ COPY --from=aic_kilted /ws_aic /ws_aic
 
 WORKDIR /workspace/isaaclab
 
+RUN apt-get update && apt-get install -y rename && \
+    cd /ws_aic/src/aic/aic_assets/models && \
+    find . -depth -name "*[- ]*" -exec rename 's/[- ]/_/g' {} +
+
+RUN cd /ws_aic/src/aic/aic_utils/aic_isaac && \
+  /isaac-sim/python.sh ./scripts/urdf_2_usd.py --input ./assets/staging/URDFs/aic_robot.urdf --output ./assets/aic_robot.usd
+
 
 # # --- STAGE 4: Final image ---
-# FROM aic_kilted AS aic_gz_usd
+FROM aic_kilted AS export_assets
 
-# # Copy assets from aic_urdf
-# # COPY --from=aic_urdf /ws_aic /ws_aic
+# Copy assets from aic_urdf
+COPY --from=aic_urdf /ws_aic/src/aic/aic_utils/aic_isaac/assets/aic_robot.usd /ws_aic/src/aic/aic_utils/aic_isaac/assets/staging/USDs/aic_robot.usd
 
 # WORKDIR /ws_aic/src/aic/aic_utils/aic_isaac
 
 RUN cat <<'EOF' > /entrypoint.sh
 #!/bin/bash
 set -e
-source /ws_aic/install/setup.bash
+# source /ws_aic/install/setup.bash
 exec "$@"
 EOF
 

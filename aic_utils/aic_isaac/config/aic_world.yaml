@@ -2,8 +2,8 @@
 
 remove_models:
   - "ur5e"
-light_intensity_multiplier: 100
-enclosure_intensity_mulitipler: 1000
+light_intensity_multiplier: 300
+enclosure_intensity_multiplier: 1000
 
 replace_meshes:
   walls_visual: "./assets/staging/USDAs/walls_visual.usda"

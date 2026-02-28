@@ -71,6 +71,8 @@ def modify_sdf(sdf_path, config_path, output_path):
         enclosure_intensity_multiplier = config.get(
             "enclosure_intensity_multiplier", 1.0
         )
+        print(f"Light intensity multiplier: {intensity_multiplier} ")
+        print(f"Enclosure intensity multiplier: {enclosure_intensity_multiplier} ")
         if intensity_multiplier != 1.0 or enclosure_intensity_multiplier != 1.0:
             for light in world.findall("light"):
                 multiplier = intensity_multiplier
