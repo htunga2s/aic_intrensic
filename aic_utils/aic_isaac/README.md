@@ -58,15 +58,6 @@ cd IsaacLab
 ./docker/container.py build base
 ```
 
-Start ```isaac-lab-base``` docker container:
-```bash
-./docker/container.py start base
-```
-
-Attach ```bash``` shell to ```isaac-lab-base``` docker container:
-```bash
-./docker/container.py enter base
-```
 
 ### AIC Repo
 In the IsaacLab repository create ```ws_aic/src```:
@@ -97,6 +88,73 @@ cd ~/IsaacLab/ws_aic/src/aic
 ./aic_utils/aic_isaac/aic_usd_generator.sh
 ```
 
+Start ```isaac-lab-base``` docker container:
+```bash
+./docker/container.py start base
+```
+
+Attach ```bash``` shell to ```isaac-lab-base``` docker container:
+```bash
+./docker/container.py enter base
+```
+
+## Directory Structure
+
+```
+├── aic_utils
+│   ├── aic_isaac
+│   │   ├── aic_unified_robot.urdf
+│   │   ├── aic_usd_generator.sh
+│   │   ├── config
+│   │   │   ├── aic_enclosure.yaml
+│   │   │   └── aic_world.yaml
+│   │   ├── README.md
+│   │   └── scripts
+│   │       ├── filter_sdf.py
+│   │       └── patch_usda.py
+├── docker
+│   ├── aic_converter
+│   │   ├── Dockerfile
+│   │   └── zenoh_router_config.json5
+```
 
 
+## Technical Description of USD Generation Workflow
+The USD generation process is encapsulated within a multi-stage Docker build (```docker/aic_converter/Dockerfile```) that automates 
+the conversion of Gazebo assets to Isaac Lab-compatible USD files. 
 
+### 1. Static Asset Conversion 
+**Base**: nvcr.io/nvidia/isaac-lab:2.3.2 
+**Process**: Raw .glb assets (enclosure, floor, walls, lights) are copied into the container and converted to .usd format using Isaac Lab's 
+internal mesh conversion tools (convert_mesh.py). 
+
+### 2. Scene Capture via Gazebo 
+**Base**: ros:kilted-ros-base 
+**Setup**: Installs ROS 2 Kilted, Gazebo Ionic, OpenUSD, and gz-usd.
+**Execution**: Launches the AIC Gazebo environment (aic_gz_bringup) in headless mode. A Gazebo system plugin captures the complete world state and exports it as a single SDF file (/tmp/aic.sdf).
+
+### 3. SDF Processing and Conversion 
+The exported SDF undergoes a pipeline of transformations: 
+1. **Filtering**: ```filter_sdf.py``` splits the raw SDF into specific components (e.g., aic_world.sdf, aic_enclosure.sdf) based on configuration rules. 
+2. **SDF to USD**: ```sdf2usd``` (from gz-usd) converts the filtered SDF files into binary USD files. 
+3. **USD to USDA**: ```usdcat``` (from OpenUSD) converts binary USDs to human-readable USDA files for easier inspection and patching. 
+
+### 4. Post-Processing 
+**Patching**: ```patch_usda.py``` injects Isaac Lab specific attributes and visual mesh fixes into the USDA files. 
+**URDF Generation**: The robot description is processed via xacro to generate a clean URDF file (aic_robot.urdf). 
+
+The final build artifacts are staged in ```aic/aic_utils/aic_isaac/assets/``` directory and copied to the host system.
+
+
+## Future Work
+
+Planned improvements for the workflow:
+- Export USD files instead of USDA
+- Add support to generate Task Board USD
+
+
+## Resources
+
+- [Isaac Lab Documentation](https://isaac-sim.github.io/IsaacLab/main/index.html)
+- [AIC Getting Started Guide](../../docs/getting_started.md)
+- [AIC Scene Description](../../docs/scene_description.md)

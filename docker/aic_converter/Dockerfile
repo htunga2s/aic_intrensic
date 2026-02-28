@@ -144,16 +144,19 @@ RUN  mkdir -p ./assets/staging/USDAs && \
 RUN python3 ./scripts/patch_usda.py ./assets/staging/USDAs/aic_world.usda ./config/aic_world.yaml ./assets/aic_world.usda && \
   python3 ./scripts/patch_usda.py ./assets/staging/USDAs/aic_enclosure.usda ./config/aic_enclosure.yaml ./assets/aic_enclosure.usda
 
-# Convert final USDAs to USDz
+# Generate Robot URDF
+RUN mkdir -p ./assets/staging/URDFs && \
+  source /ws_aic/install/setup.bash && \
+  ros2 run xacro xacro /ws_aic/src/aic/aic_description/urdf/ur_gz.urdf.xacro -o ./assets/staging/URDFs/aic_robot.urdf name:=ur
 
 
 # # --- STAGE 3: Final image ---
-# FROM aic_isaaclab_stage AS aic_urdf
+FROM aic_isaaclab AS aic_urdf
 
-# # Copy assets from aic_kilted
-# # COPY --from=aic_kilted /ws_aic /ws_aic
+# Copy assets from aic_kilted
+COPY --from=aic_kilted /ws_aic /ws_aic
 
-# WORKDIR /workspace/isaaclab
+WORKDIR /workspace/isaaclab
 
 
 # # --- STAGE 4: Final image ---

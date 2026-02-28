@@ -48,7 +48,7 @@ def modify_sdf(sdf_path, config_path, output_path):
             direction.text = "0 0 -1"
 
             intensity = ET.SubElement(spot_light, "intensity")
-            intensity.text = "1000"
+            intensity.text = "1"
 
             diffuse = ET.SubElement(spot_light, "diffuse")
             diffuse.text = "1 1 1 1"
@@ -68,21 +68,28 @@ def modify_sdf(sdf_path, config_path, output_path):
 
         # --- RULE 4: Adjust Light Intensity ---
         intensity_multiplier = config.get("light_intensity_multiplier", 1.0)
-        if intensity_multiplier != 1.0:
+        enclosure_intensity_multiplier = config.get(
+            "enclosure_intensity_multiplier", 1.0
+        )
+        if intensity_multiplier != 1.0 or enclosure_intensity_multiplier != 1.0:
             for light in world.findall("light"):
+                multiplier = intensity_multiplier
+                light_name = light.get("name")
+
+                if light_name == "enclosure_light":
+                    multiplier = enclosure_intensity_multiplier
+
+                if multiplier == 1.0:
+                    continue
+
                 intensity_tag = light.find("intensity")
                 if intensity_tag is not None and intensity_tag.text:
-                    # 1. Read the existing value and convert it to a float
                     existing_val = float(intensity_tag.text)
-
-                    # 2. Multiply by your config multiplier
-                    new_val = existing_val * intensity_multiplier
-
-                    # 3. Write it back as a string (formatting to 3 decimal places keeping the SDF clean)
+                    new_val = existing_val * multiplier
                     intensity_tag.text = f"{new_val:.2f}"
                     print(
                         "Updated light"
-                        f" '{light.get('name')}' intensity to {intensity_tag.text}"
+                        f" '{light_name}' intensity to {intensity_tag.text}"
                     )
 
     # 3. Save the Modified SDF
