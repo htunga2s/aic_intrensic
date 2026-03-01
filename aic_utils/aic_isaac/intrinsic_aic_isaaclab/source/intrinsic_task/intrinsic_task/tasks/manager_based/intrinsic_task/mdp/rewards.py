@@ -18,8 +18,9 @@ if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
 
-
-def position_command_error(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+def position_command_error(
+    env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg
+) -> torch.Tensor:
     """Penalize tracking of the position error using L2-norm.
 
     The function computes the position error between the desired position (from the command) and the
@@ -31,7 +32,9 @@ def position_command_error(env: ManagerBasedRLEnv, command_name: str, asset_cfg:
     command = env.command_manager.get_command(command_name)
     # obtain the desired and current positions
     des_pos_b = command[:, :3]
-    des_pos_w, _ = combine_frame_transforms(asset.data.root_pos_w, asset.data.root_quat_w, des_pos_b)
+    des_pos_w, _ = combine_frame_transforms(
+        asset.data.root_pos_w, asset.data.root_quat_w, des_pos_b
+    )
     curr_pos_w = asset.data.body_pos_w[:, asset_cfg.body_ids[0]]  # type: ignore
     return torch.norm(curr_pos_w - des_pos_w, dim=1)
 
@@ -49,13 +52,17 @@ def position_command_error_tanh(
     command = env.command_manager.get_command(command_name)
     # obtain the desired and current positions
     des_pos_b = command[:, :3]
-    des_pos_w, _ = combine_frame_transforms(asset.data.root_pos_w, asset.data.root_quat_w, des_pos_b)
+    des_pos_w, _ = combine_frame_transforms(
+        asset.data.root_pos_w, asset.data.root_quat_w, des_pos_b
+    )
     curr_pos_w = asset.data.body_pos_w[:, asset_cfg.body_ids[0]]  # type: ignore
     distance = torch.norm(curr_pos_w - des_pos_w, dim=1)
     return 1 - torch.tanh(distance / std)
 
 
-def orientation_command_error(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+def orientation_command_error(
+    env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg
+) -> torch.Tensor:
     """Penalize tracking orientation error using shortest path.
 
     The function computes the orientation error between the desired orientation (from the command) and the

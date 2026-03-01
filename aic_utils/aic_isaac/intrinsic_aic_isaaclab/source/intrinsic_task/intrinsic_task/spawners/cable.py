@@ -14,10 +14,11 @@ from isaaclab.sim.utils.stage import get_current_stage
 @configclass
 class CableCfg(RigidObjectSpawnerCfg):
     """Config for a cable/rope."""
+
     func: Callable = None  # Set below after function definition
-    rope_length: float = 1.0      # total rope length in meters
-    link_radius: float = 0.01     # capsule radius in meters
-    spawn_height: float = 0.5     # Z height at which the rope is spawned
+    rope_length: float = 1.0  # total rope length in meters
+    link_radius: float = 0.01  # capsule radius in meters
+    spawn_height: float = 0.5  # Z height at which the rope is spawned
 
 
 # 2. Spawner function
@@ -57,20 +58,23 @@ def spawn_cable(
     # if cfg.mass_props is not None:
     #     schemas.define_mass_properties(prim_path, cfg.mass_props, stage=stage)
 
-
     # configure ropes (all units in meters):
-    linkRadius = cfg.link_radius              # e.g. 0.01 m
-    linkHalfLength = linkRadius * 2.0         # capsule half-height; keeps a reasonable aspect ratio
-    ropeLength = cfg.rope_length              # e.g. 1.0 m
+    linkRadius = cfg.link_radius  # e.g. 0.01 m
+    linkHalfLength = (
+        linkRadius * 2.0
+    )  # capsule half-height; keeps a reasonable aspect ratio
+    ropeLength = cfg.rope_length  # e.g. 1.0 m
     ropeColor = Gf.Vec3f(0.9, 0.5, 0.5)
     coneAngleLimit = 110
     rope_damping = 10.0
     rope_stiffness = 1.0
-    contactOffset = linkRadius * 0.2          # small relative to link size
+    contactOffset = linkRadius * 0.2  # small relative to link size
 
     stage = get_current_stage()
     UsdShade.Material.Define(stage, f"{prim_path}/PhysicsMaterial")
-    material = UsdPhysics.MaterialAPI.Apply(stage.GetPrimAtPath(f"{prim_path}/PhysicsMaterial"))
+    material = UsdPhysics.MaterialAPI.Apply(
+        stage.GetPrimAtPath(f"{prim_path}/PhysicsMaterial")
+    )
     material.CreateStaticFrictionAttr().Set(0.5)
     material.CreateDynamicFrictionAttr().Set(0.5)
     material.CreateRestitutionAttr().Set(0)
@@ -110,7 +114,9 @@ def spawn_cable(
         physxCollisionAPI = PhysxSchema.PhysxCollisionAPI.Apply(prim)
         physxCollisionAPI.CreateRestOffsetAttr().Set(0.0)
         physxCollisionAPI.CreateContactOffsetAttr().Set(contactOffset)
-        physicsUtils.add_physics_material_to_prim(stage, prim, f"{prim_path}/PhysicsMaterial")
+        physicsUtils.add_physics_material_to_prim(
+            stage, prim, f"{prim_path}/PhysicsMaterial"
+        )
 
     # Create one joint prim per consecutive link pair
     for linkInd in range(numLinks - 1):
@@ -142,7 +148,6 @@ def spawn_cable(
             driveAPI.CreateTypeAttr("force")
             driveAPI.CreateDampingAttr(rope_damping)
             driveAPI.CreateStiffnessAttr(rope_stiffness)
-
 
     return stage.GetPrimAtPath(prim_path)
 

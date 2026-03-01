@@ -5,6 +5,7 @@
 
 import omni.ext
 
+
 # Any class derived from `omni.ext.IExt` in top level module (defined in `python.modules` of `extension.toml`) will be
 # instantiated when extension gets enabled and `on_startup(ext_id)` will be called. Later when extension gets disabled
 # on_shutdown() is called.
@@ -14,7 +15,9 @@ class ExampleExtension(omni.ext.IExt):
     def on_startup(self, ext_id):
         print("[intrinsic_task] startup")
 
-        self._window = omni.ui.Window("Intrinsic Hackathon Debug", width=300, height=300)
+        self._window = omni.ui.Window(
+            "Intrinsic Hackathon Debug", width=300, height=300
+        )
         with self._window.frame:
             with omni.ui.VStack():
                 # label = omni.ui.Label("Intrinsic Hackathon Debug")
@@ -30,17 +33,20 @@ class ExampleExtension(omni.ext.IExt):
         from pxr import Usd, UsdGeom, Gf, UsdPhysics, UsdShade, Sdf, PhysxSchema
         from omni.physx.scripts import physicsUtils
         import omni.usd
+
         stage = omni.usd.get_context().get_stage()
 
         # configure ropes (all units in meters):
-        linkRadius = 0.003             # e.g. 0.01 m
-        linkHalfLength = linkRadius * 2.0         # capsule half-height; keeps a reasonable aspect ratio
-        ropeLength = 0.3              # e.g. 1.0 m
+        linkRadius = 0.003  # e.g. 0.01 m
+        linkHalfLength = (
+            linkRadius * 2.0
+        )  # capsule half-height; keeps a reasonable aspect ratio
+        ropeLength = 0.3  # e.g. 1.0 m
         ropeColor = Gf.Vec3f(0.5, 0.1, 0.1)
         coneAngleLimit = 80
         rope_damping = 0.1
         rope_stiffness = 1.0
-        contactOffset = linkRadius * 0.02          # small relative to link size
+        contactOffset = linkRadius * 0.02  # small relative to link size
 
         # stage = get_current_stage()
         prim_path = "/World/Rope"
@@ -52,17 +58,19 @@ class ExampleExtension(omni.ext.IExt):
         rope_prim.AddRotateXYZOp().Set(Gf.Vec3d(0, 0, 0))
         # add scale op to the rope prim
         rope_prim.AddScaleOp().Set(Gf.Vec3d(1, 1, 1))
-    
+
         # Define PhysicsMaterial prim for the rope
         UsdShade.Material.Define(stage, f"{prim_path}/PhysicsMaterial")
-        material = UsdPhysics.MaterialAPI.Apply(stage.GetPrimAtPath(f"{prim_path}/PhysicsMaterial"))
+        material = UsdPhysics.MaterialAPI.Apply(
+            stage.GetPrimAtPath(f"{prim_path}/PhysicsMaterial")
+        )
         material.CreateStaticFrictionAttr().Set(0.1)
         material.CreateDynamicFrictionAttr().Set(0.1)
         material.CreateRestitutionAttr().Set(0)
 
         linkLength = 2.0 * linkHalfLength - linkRadius
         numLinks = max(1, int(ropeLength / linkLength))
-        xStart = 0.0 # -numLinks * linkLength * 0.5
+        xStart = 0.0  # -numLinks * linkLength * 0.5
         yStart = 0.0
 
         scopePath = Sdf.Path(prim_path).AppendChild("Rope")
@@ -95,7 +103,9 @@ class ExampleExtension(omni.ext.IExt):
             physxCollisionAPI = PhysxSchema.PhysxCollisionAPI.Apply(prim)
             physxCollisionAPI.CreateRestOffsetAttr().Set(0.0)
             physxCollisionAPI.CreateContactOffsetAttr().Set(contactOffset)
-            physicsUtils.add_physics_material_to_prim(stage, prim, f"{prim_path}/PhysicsMaterial")
+            physicsUtils.add_physics_material_to_prim(
+                stage, prim, f"{prim_path}/PhysicsMaterial"
+            )
 
         # Create one joint prim per consecutive link pair
         for linkInd in range(numLinks - 1):
@@ -128,7 +138,7 @@ class ExampleExtension(omni.ext.IExt):
                 # driveAPI.CreateDampingAttr(rope_damping)
                 # driveAPI.CreateStiffnessAttr(rope_stiffness)
 
-        # Define a USD PhysicsFixedJoint 
+        # Define a USD PhysicsFixedJoint
         fixedJoint = UsdPhysics.FixedJoint.Define(stage, f"{prim_path}/fixedJoint")
         fixedJoint.GetBody0Rel().SetTargets([linkPaths[0]])
         fixedJoint.GetBody1Rel().SetTargets([Sdf.Path("/World/sc_plug_visual")])

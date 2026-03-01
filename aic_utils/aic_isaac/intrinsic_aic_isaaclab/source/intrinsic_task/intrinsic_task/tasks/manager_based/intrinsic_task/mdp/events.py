@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import math
@@ -20,7 +19,10 @@ def sample_object_poses(
     pose_range: dict[str, tuple[float, float]] = {},
     max_sample_tries: int = 5000,
 ):
-    range_list = [pose_range.get(key, (0.0, 0.0)) for key in ["x", "y", "z", "roll", "pitch", "yaw"]]
+    range_list = [
+        pose_range.get(key, (0.0, 0.0))
+        for key in ["x", "y", "z", "roll", "pitch", "yaw"]
+    ]
     pose_list = []
 
     for i in range(num_objects):
@@ -33,7 +35,9 @@ def sample_object_poses(
                 break
 
             # Check if pose of object is sufficiently far away from all other objects
-            separation_check = [math.dist(sample[:3], pose[:3]) > min_separation for pose in pose_list]
+            separation_check = [
+                math.dist(sample[:3], pose[:3]) > min_separation for pose in pose_list
+            ]
             if False not in separation_check:
                 pose_list.append(sample)
                 break
@@ -69,10 +73,14 @@ def randomize_object_pose(
             # Write pose to simulation
             pose_tensor = torch.tensor([pose_list[i]], device=env.device)
             positions = pose_tensor[:, 0:3] + env.scene.env_origins[cur_env, 0:3]
-            orientations = math_utils.quat_from_euler_xyz(pose_tensor[:, 3], pose_tensor[:, 4], pose_tensor[:, 5])
+            orientations = math_utils.quat_from_euler_xyz(
+                pose_tensor[:, 3], pose_tensor[:, 4], pose_tensor[:, 5]
+            )
             asset.write_root_pose_to_sim(
-                torch.cat([positions, orientations], dim=-1), env_ids=torch.tensor([cur_env], device=env.device)
+                torch.cat([positions, orientations], dim=-1),
+                env_ids=torch.tensor([cur_env], device=env.device),
             )
             asset.write_root_velocity_to_sim(
-                torch.zeros(1, 6, device=env.device), env_ids=torch.tensor([cur_env], device=env.device)
+                torch.zeros(1, 6, device=env.device),
+                env_ids=torch.tensor([cur_env], device=env.device),
             )

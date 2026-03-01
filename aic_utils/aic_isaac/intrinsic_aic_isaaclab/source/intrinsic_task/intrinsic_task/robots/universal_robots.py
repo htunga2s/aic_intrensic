@@ -61,7 +61,9 @@ UR10e_CFG = ArticulationCfg(
             max_depenetration_velocity=5.0,
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
-            enabled_self_collisions=False, solver_position_iteration_count=16, solver_velocity_iteration_count=1
+            enabled_self_collisions=False,
+            solver_position_iteration_count=16,
+            solver_velocity_iteration_count=1,
         ),
         activate_contact_sensors=False,
     ),
@@ -106,7 +108,9 @@ UR10e_CFG = ArticulationCfg(
 """Configuration of UR-10 arm using implicit actuator models."""
 
 UR10_LONG_SUCTION_CFG = UR10_CFG.copy()
-UR10_LONG_SUCTION_CFG.spawn.usd_path = f"{ISAAC_NUCLEUS_DIR}/Robots/UniversalRobots/ur10/ur10.usd"
+UR10_LONG_SUCTION_CFG.spawn.usd_path = (
+    f"{ISAAC_NUCLEUS_DIR}/Robots/UniversalRobots/ur10/ur10.usd"
+)
 UR10_LONG_SUCTION_CFG.spawn.variants = {"Gripper": "Long_Suction"}
 UR10_LONG_SUCTION_CFG.spawn.rigid_props.disable_gravity = True
 UR10_LONG_SUCTION_CFG.init_state.joint_pos = {
@@ -155,7 +159,11 @@ UR10e_ROBOTIQ_GRIPPER_CFG.actuators["gripper_finger"] = ImplicitActuatorCfg(
 )
 # the passive joints for gripper
 UR10e_ROBOTIQ_GRIPPER_CFG.actuators["gripper_passive"] = ImplicitActuatorCfg(
-    joint_names_expr=[".*_inner_finger_pad_joint", ".*_outer_finger_joint", "right_outer_knuckle_joint"],
+    joint_names_expr=[
+        ".*_inner_finger_pad_joint",
+        ".*_outer_finger_joint",
+        "right_outer_knuckle_joint",
+    ],
     effort_limit_sim=1.0,
     velocity_limit_sim=1.0,
     stiffness=0.0,
@@ -213,8 +221,8 @@ UR5e arm without gripper
 
 UR5E_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        #usd_path=f"https://isaac-dev.ov.nvidia.com/omni/web3/omniverse://isaac-dev.ov.nvidia.com/Projects/Intrinsic/UR5e+gripper.usd",
-        usd_path = f"https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Robots/UniversalRobots/ur5e/ur5e.usd",
+        # usd_path=f"https://isaac-dev.ov.nvidia.com/omni/web3/omniverse://isaac-dev.ov.nvidia.com/Projects/Intrinsic/UR5e+gripper.usd",
+        usd_path=f"https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Robots/UniversalRobots/ur5e/ur5e.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
             max_depenetration_velocity=5.0,
