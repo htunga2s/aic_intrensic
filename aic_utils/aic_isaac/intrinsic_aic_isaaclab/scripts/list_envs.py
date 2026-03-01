@@ -21,7 +21,9 @@ from isaaclab.app import AppLauncher
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="List Isaac Lab environments.")
-parser.add_argument("--keyword", type=str, default=None, help="Keyword to filter environments.")
+parser.add_argument(
+    "--keyword", type=str, default=None, help="Keyword to filter environments."
+)
 # parse the arguments
 args_cli = parser.parse_args()
 
@@ -52,9 +54,18 @@ def main():
     index = 0
     # acquire all Isaac environments names
     for task_spec in gym.registry.values():
-        if "Intrinsic-" in task_spec.id and (args_cli.keyword is None or args_cli.keyword in task_spec.id):
+        if "Intrinsic-" in task_spec.id and (
+            args_cli.keyword is None or args_cli.keyword in task_spec.id
+        ):
             # add details to table
-            table.add_row([index + 1, task_spec.id, task_spec.entry_point, task_spec.kwargs["env_cfg_entry_point"]])
+            table.add_row(
+                [
+                    index + 1,
+                    task_spec.id,
+                    task_spec.entry_point,
+                    task_spec.kwargs["env_cfg_entry_point"],
+                ]
+            )
             # increment count
             index += 1
 

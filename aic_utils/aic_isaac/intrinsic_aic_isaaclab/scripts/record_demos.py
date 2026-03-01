@@ -26,27 +26,41 @@ import contextlib
 
 from isaaclab.app import AppLauncher
 
-parser = argparse.ArgumentParser(description="Record demonstrations for Isaac Lab environments.")
+parser = argparse.ArgumentParser(
+    description="Record demonstrations for Isaac Lab environments."
+)
 parser.add_argument("--task", type=str, required=True, help="Name of the task.")
 parser.add_argument(
-    "--teleop_device", type=str, default="keyboard",
+    "--teleop_device",
+    type=str,
+    default="keyboard",
     help="Teleop device. Built-ins: keyboard, spacemouse, gamepad.",
 )
 parser.add_argument(
-    "--dataset_file", type=str, default="./datasets/dataset.hdf5",
+    "--dataset_file",
+    type=str,
+    default="./datasets/dataset.hdf5",
     help="File path to export recorded demos.",
 )
-parser.add_argument("--step_hz", type=int, default=30, help="Environment stepping rate in Hz.")
 parser.add_argument(
-    "--num_demos", type=int, default=0,
+    "--step_hz", type=int, default=30, help="Environment stepping rate in Hz."
+)
+parser.add_argument(
+    "--num_demos",
+    type=int,
+    default=0,
     help="Number of demonstrations to record. Set to 0 for infinite.",
 )
 parser.add_argument(
-    "--num_success_steps", type=int, default=10,
+    "--num_success_steps",
+    type=int,
+    default=10,
     help="Consecutive steps with task success to conclude a demo as successful.",
 )
 parser.add_argument(
-    "--disable_fabric", action="store_true", default=False,
+    "--disable_fabric",
+    action="store_true",
+    default=False,
     help="Disable fabric and use USD I/O operations.",
 )
 
@@ -66,7 +80,14 @@ from collections.abc import Callable
 import gymnasium as gym
 import torch
 
-from isaaclab.devices import Se3Gamepad, Se3GamepadCfg, Se3Keyboard, Se3KeyboardCfg, Se3SpaceMouse, Se3SpaceMouseCfg
+from isaaclab.devices import (
+    Se3Gamepad,
+    Se3GamepadCfg,
+    Se3Keyboard,
+    Se3KeyboardCfg,
+    Se3SpaceMouse,
+    Se3SpaceMouseCfg,
+)
 from isaaclab.devices.teleop_device_factory import create_teleop_device
 from isaaclab.envs import DirectRLEnvCfg, ManagerBasedRLEnvCfg
 from isaaclab.envs.mdp.recorders.recorders_cfg import ActionStateRecorderManagerCfg
@@ -115,7 +136,9 @@ def main() -> None:
 
     # Parse environment config
     env_cfg = parse_env_cfg(
-        args_cli.task, device=args_cli.device, num_envs=1,
+        args_cli.task,
+        device=args_cli.device,
+        num_envs=1,
         use_fabric=not args_cli.disable_fabric,
     )
     env_cfg.env_name = args_cli.task.split(":")[-1]
@@ -126,7 +149,9 @@ def main() -> None:
         success_term = env_cfg.terminations.success
         env_cfg.terminations.success = None
     else:
-        logger.warning("No success termination term found. Cannot mark demos as successful.")
+        logger.warning(
+            "No success termination term found. Cannot mark demos as successful."
+        )
 
     # Run indefinitely until goal or manual reset
     env_cfg.terminations.time_out = None
@@ -171,7 +196,10 @@ def main() -> None:
 
     # Set up teleop device
     teleop_interface = None
-    if hasattr(env_cfg, "teleop_devices") and args_cli.teleop_device in env_cfg.teleop_devices.devices:
+    if (
+        hasattr(env_cfg, "teleop_devices")
+        and args_cli.teleop_device in env_cfg.teleop_devices.devices
+    ):
         teleop_interface = create_teleop_device(
             args_cli.teleop_device, env_cfg.teleop_devices.devices, callbacks
         )
@@ -182,15 +210,23 @@ def main() -> None:
         sensitivity = 1.0
         if args_cli.teleop_device.lower() == "keyboard":
             teleop_interface = Se3Keyboard(
-                Se3KeyboardCfg(pos_sensitivity=0.05 * sensitivity, rot_sensitivity=0.05 * sensitivity)
+                Se3KeyboardCfg(
+                    pos_sensitivity=0.05 * sensitivity,
+                    rot_sensitivity=0.05 * sensitivity,
+                )
             )
         elif args_cli.teleop_device.lower() == "spacemouse":
             teleop_interface = Se3SpaceMouse(
-                Se3SpaceMouseCfg(pos_sensitivity=0.05 * sensitivity, rot_sensitivity=0.05 * sensitivity)
+                Se3SpaceMouseCfg(
+                    pos_sensitivity=0.05 * sensitivity,
+                    rot_sensitivity=0.05 * sensitivity,
+                )
             )
         elif args_cli.teleop_device.lower() == "gamepad":
             teleop_interface = Se3Gamepad(
-                Se3GamepadCfg(pos_sensitivity=0.1 * sensitivity, rot_sensitivity=0.1 * sensitivity)
+                Se3GamepadCfg(
+                    pos_sensitivity=0.1 * sensitivity, rot_sensitivity=0.1 * sensitivity
+                )
             )
         else:
             logger.error(f"Unsupported teleop device: {args_cli.teleop_device}")
@@ -236,9 +272,12 @@ def main() -> None:
                 if bool(success_term.func(env, **success_term.params)[0]):
                     success_step_count += 1
                     if success_step_count >= args_cli.num_success_steps:
-                        env.recorder_manager.record_pre_reset([0], force_export_or_skip=False)
+                        env.recorder_manager.record_pre_reset(
+                            [0], force_export_or_skip=False
+                        )
                         env.recorder_manager.set_success_to_episodes(
-                            [0], torch.tensor([[True]], dtype=torch.bool, device=env.device)
+                            [0],
+                            torch.tensor([[True]], dtype=torch.bool, device=env.device),
                         )
                         env.recorder_manager.export_episodes([0])
                         print("Success condition met! Episode recorded.")
@@ -247,13 +286,25 @@ def main() -> None:
                     success_step_count = 0
 
             # Update demo count
-            if env.recorder_manager.exported_successful_episode_count > current_recorded_demo_count:
-                current_recorded_demo_count = env.recorder_manager.exported_successful_episode_count
-                print(f"Recorded {current_recorded_demo_count} successful demonstrations.")
+            if (
+                env.recorder_manager.exported_successful_episode_count
+                > current_recorded_demo_count
+            ):
+                current_recorded_demo_count = (
+                    env.recorder_manager.exported_successful_episode_count
+                )
+                print(
+                    f"Recorded {current_recorded_demo_count} successful demonstrations."
+                )
 
             # Check if target reached
-            if args_cli.num_demos > 0 and current_recorded_demo_count >= args_cli.num_demos:
-                print(f"All {current_recorded_demo_count} demonstrations recorded. Exiting.")
+            if (
+                args_cli.num_demos > 0
+                and current_recorded_demo_count >= args_cli.num_demos
+            ):
+                print(
+                    f"All {current_recorded_demo_count} demonstrations recorded. Exiting."
+                )
                 target_time = time.time() + 0.8
                 while time.time() < target_time:
                     rate_limiter.sleep(env)
@@ -274,7 +325,9 @@ def main() -> None:
             rate_limiter.sleep(env)
 
     env.close()
-    print(f"Recording session completed with {current_recorded_demo_count} successful demonstrations")
+    print(
+        f"Recording session completed with {current_recorded_demo_count} successful demonstrations"
+    )
     print(f"Demonstrations saved to: {args_cli.dataset_file}")
 
 

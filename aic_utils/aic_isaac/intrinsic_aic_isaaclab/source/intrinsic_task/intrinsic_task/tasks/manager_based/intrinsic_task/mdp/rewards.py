@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 # Command-pose tracking (position)
 # ---------------------------------------------------------------------------
 
+
 def position_command_error(
     env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg
 ) -> torch.Tensor:
@@ -37,7 +38,9 @@ def position_command_error(
     asset: RigidObject = env.scene[asset_cfg.name]
     command = env.command_manager.get_command(command_name)
     des_pos_b = command[:, :3]
-    des_pos_w, _ = combine_frame_transforms(asset.data.root_pos_w, asset.data.root_quat_w, des_pos_b)
+    des_pos_w, _ = combine_frame_transforms(
+        asset.data.root_pos_w, asset.data.root_quat_w, des_pos_b
+    )
     curr_pos_w = asset.data.body_pos_w[:, asset_cfg.body_ids[0]]  # type: ignore
     return torch.norm(curr_pos_w - des_pos_w, dim=1)
 
@@ -49,7 +52,9 @@ def position_command_error_tanh(
     asset: RigidObject = env.scene[asset_cfg.name]
     command = env.command_manager.get_command(command_name)
     des_pos_b = command[:, :3]
-    des_pos_w, _ = combine_frame_transforms(asset.data.root_pos_w, asset.data.root_quat_w, des_pos_b)
+    des_pos_w, _ = combine_frame_transforms(
+        asset.data.root_pos_w, asset.data.root_quat_w, des_pos_b
+    )
     curr_pos_w = asset.data.body_pos_w[:, asset_cfg.body_ids[0]]  # type: ignore
     distance = torch.norm(curr_pos_w - des_pos_w, dim=1)
     return 1 - torch.tanh(distance / std)
@@ -67,7 +72,9 @@ def position_command_error_exp(
     asset: RigidObject = env.scene[asset_cfg.name]
     command = env.command_manager.get_command(command_name)
     des_pos_b = command[:, :3]
-    des_pos_w, _ = combine_frame_transforms(asset.data.root_pos_w, asset.data.root_quat_w, des_pos_b)
+    des_pos_w, _ = combine_frame_transforms(
+        asset.data.root_pos_w, asset.data.root_quat_w, des_pos_b
+    )
     curr_pos_w = asset.data.body_pos_w[:, asset_cfg.body_ids[0]]  # type: ignore
     dist_sq = torch.sum(torch.square(curr_pos_w - des_pos_w), dim=1)
     return torch.exp(-dist_sq / (sigma**2))
@@ -76,6 +83,7 @@ def position_command_error_exp(
 # ---------------------------------------------------------------------------
 # Command-pose tracking (orientation)
 # ---------------------------------------------------------------------------
+
 
 def orientation_command_error(
     env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg
@@ -110,6 +118,7 @@ def orientation_command_error_tanh(
 # Sparse reaching bonus
 # ---------------------------------------------------------------------------
 
+
 def ee_reaching_bonus(
     env: ManagerBasedRLEnv,
     threshold: float,
@@ -120,7 +129,9 @@ def ee_reaching_bonus(
     asset: RigidObject = env.scene[asset_cfg.name]
     command = env.command_manager.get_command(command_name)
     des_pos_b = command[:, :3]
-    des_pos_w, _ = combine_frame_transforms(asset.data.root_pos_w, asset.data.root_quat_w, des_pos_b)
+    des_pos_w, _ = combine_frame_transforms(
+        asset.data.root_pos_w, asset.data.root_quat_w, des_pos_b
+    )
     curr_pos_w = asset.data.body_pos_w[:, asset_cfg.body_ids[0]]  # type: ignore
     distance = torch.norm(curr_pos_w - des_pos_w, dim=1)
     return (distance < threshold).float()
@@ -130,12 +141,15 @@ def ee_reaching_bonus(
 # Smoothness / safety penalties
 # ---------------------------------------------------------------------------
 
+
 def joint_torques_l2(
     env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
 ) -> torch.Tensor:
     """Penalize applied joint torques (L2 squared)."""
     asset: Articulation = env.scene[asset_cfg.name]
-    return torch.sum(torch.square(asset.data.applied_torque[:, asset_cfg.joint_ids]), dim=1)
+    return torch.sum(
+        torch.square(asset.data.applied_torque[:, asset_cfg.joint_ids]), dim=1
+    )
 
 
 def joint_acc_l2(
@@ -167,4 +181,6 @@ def body_lin_acc_l2(
 ) -> torch.Tensor:
     """Penalize linear acceleration of selected bodies (encourages gentle motion)."""
     asset: Articulation = env.scene[asset_cfg.name]
-    return torch.sum(torch.norm(asset.data.body_lin_acc_w[:, asset_cfg.body_ids, :], dim=-1), dim=1)
+    return torch.sum(
+        torch.norm(asset.data.body_lin_acc_w[:, asset_cfg.body_ids, :], dim=-1), dim=1
+    )

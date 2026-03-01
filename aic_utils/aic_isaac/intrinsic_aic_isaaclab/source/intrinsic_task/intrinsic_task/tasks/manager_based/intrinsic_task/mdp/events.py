@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import math
@@ -21,7 +20,10 @@ def sample_object_poses(
     pose_range: dict[str, tuple[float, float]] = {},
     max_sample_tries: int = 5000,
 ):
-    range_list = [pose_range.get(key, (0.0, 0.0)) for key in ["x", "y", "z", "roll", "pitch", "yaw"]]
+    range_list = [
+        pose_range.get(key, (0.0, 0.0))
+        for key in ["x", "y", "z", "roll", "pitch", "yaw"]
+    ]
     pose_list = []
 
     for i in range(num_objects):
@@ -34,7 +36,9 @@ def sample_object_poses(
                 break
 
             # Check if pose of object is sufficiently far away from all other objects
-            separation_check = [math.dist(sample[:3], pose[:3]) > min_separation for pose in pose_list]
+            separation_check = [
+                math.dist(sample[:3], pose[:3]) > min_separation for pose in pose_list
+            ]
             if False not in separation_check:
                 pose_list.append(sample)
                 break
@@ -70,12 +74,16 @@ def randomize_object_pose(
             # Write pose to simulation
             pose_tensor = torch.tensor([pose_list[i]], device=env.device)
             positions = pose_tensor[:, 0:3] + env.scene.env_origins[cur_env, 0:3]
-            orientations = math_utils.quat_from_euler_xyz(pose_tensor[:, 3], pose_tensor[:, 4], pose_tensor[:, 5])
+            orientations = math_utils.quat_from_euler_xyz(
+                pose_tensor[:, 3], pose_tensor[:, 4], pose_tensor[:, 5]
+            )
             asset.write_root_pose_to_sim(
-                torch.cat([positions, orientations], dim=-1), env_ids=torch.tensor([cur_env], device=env.device)
+                torch.cat([positions, orientations], dim=-1),
+                env_ids=torch.tensor([cur_env], device=env.device),
             )
             asset.write_root_velocity_to_sim(
-                torch.zeros(1, 6, device=env.device), env_ids=torch.tensor([cur_env], device=env.device)
+                torch.zeros(1, 6, device=env.device),
+                env_ids=torch.tensor([cur_env], device=env.device),
             )
 
 
@@ -103,6 +111,7 @@ def randomize_xform_position(
 
 import omni.usd
 from pxr import UsdLux, Gf
+
 
 def randomize_dome_light(
     env: ManagerBasedEnv,
@@ -157,9 +166,18 @@ def reset_asset_base_position(
 
         xform = UsdGeom.Xformable(prim)
         # sample random offsets
-        x = default_pos[0] + torch.empty(1).uniform_(*pose_range.get("x", (0.0, 0.0))).item()
-        y = default_pos[1] + torch.empty(1).uniform_(*pose_range.get("y", (0.0, 0.0))).item()
-        z = default_pos[2] + torch.empty(1).uniform_(*pose_range.get("z", (0.0, 0.0))).item()
+        x = (
+            default_pos[0]
+            + torch.empty(1).uniform_(*pose_range.get("x", (0.0, 0.0))).item()
+        )
+        y = (
+            default_pos[1]
+            + torch.empty(1).uniform_(*pose_range.get("y", (0.0, 0.0))).item()
+        )
+        z = (
+            default_pos[2]
+            + torch.empty(1).uniform_(*pose_range.get("z", (0.0, 0.0))).item()
+        )
 
         # set the translate op
         xform_ops = xform.GetOrderedXformOps()
@@ -179,7 +197,6 @@ def _set_prim_translate(stage, prim_path: str, pos: tuple[float, float, float]):
         if op.GetOpType() == UsdGeom.XformOp.TypeTranslate:
             op.Set(Gf.Vec3d(*pos))
             return
-
 
 
 def _sample_axis(pose_range: dict, snap_step: dict, axis: str) -> float:
@@ -217,11 +234,19 @@ def randomize_board_and_parts(
     stage = omni.usd.get_context().get_stage()
 
     for env_id in env_ids.tolist():
-        bx = board_default_pos[0] + torch.empty(1).uniform_(*board_range.get("x", (0.0, 0.0))).item()
-        by = board_default_pos[1] + torch.empty(1).uniform_(*board_range.get("y", (0.0, 0.0))).item()
+        bx = (
+            board_default_pos[0]
+            + torch.empty(1).uniform_(*board_range.get("x", (0.0, 0.0))).item()
+        )
+        by = (
+            board_default_pos[1]
+            + torch.empty(1).uniform_(*board_range.get("y", (0.0, 0.0))).item()
+        )
         bz = board_default_pos[2]
 
-        resolved_board = board_path.replace("{ENV_REGEX_NS}", f"/World/envs/env_{env_id}")
+        resolved_board = board_path.replace(
+            "{ENV_REGEX_NS}", f"/World/envs/env_{env_id}"
+        )
         _set_prim_translate(stage, resolved_board, (bx, by, bz))
 
         for part in parts:
@@ -231,5 +256,7 @@ def randomize_board_and_parts(
             px = bx + ox + _sample_axis(pr, snap, "x")
             py = by + oy + _sample_axis(pr, snap, "y")
             pz = bz + oz
-            resolved = part["prim_path"].replace("{ENV_REGEX_NS}", f"/World/envs/env_{env_id}")
+            resolved = part["prim_path"].replace(
+                "{ENV_REGEX_NS}", f"/World/envs/env_{env_id}"
+            )
             _set_prim_translate(stage, resolved, (px, py, pz))

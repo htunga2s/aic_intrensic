@@ -12,19 +12,33 @@ from collections.abc import Callable
 
 from isaaclab.app import AppLauncher
 
-parser = argparse.ArgumentParser(description="Teleoperation for Isaac Lab environments.")
-parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
+parser = argparse.ArgumentParser(
+    description="Teleoperation for Isaac Lab environments."
+)
 parser.add_argument(
-    "--teleop_device", type=str, default="keyboard",
+    "--num_envs", type=int, default=1, help="Number of environments to simulate."
+)
+parser.add_argument(
+    "--teleop_device",
+    type=str,
+    default="keyboard",
     help="Teleop device. Built-ins: keyboard, spacemouse, gamepad.",
 )
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
-parser.add_argument("--sensitivity", type=float, default=1.0, help="Sensitivity factor.")
 parser.add_argument(
-    "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
+    "--sensitivity", type=float, default=1.0, help="Sensitivity factor."
 )
 parser.add_argument(
-    "--enable_pinocchio", action="store_true", default=False, help="Enable Pinocchio.",
+    "--disable_fabric",
+    action="store_true",
+    default=False,
+    help="Disable fabric and use USD I/O operations.",
+)
+parser.add_argument(
+    "--enable_pinocchio",
+    action="store_true",
+    default=False,
+    help="Enable Pinocchio.",
 )
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
@@ -46,7 +60,14 @@ import logging
 import gymnasium as gym
 import torch
 
-from isaaclab.devices import Se3Gamepad, Se3GamepadCfg, Se3Keyboard, Se3KeyboardCfg, Se3SpaceMouse, Se3SpaceMouseCfg
+from isaaclab.devices import (
+    Se3Gamepad,
+    Se3GamepadCfg,
+    Se3Keyboard,
+    Se3KeyboardCfg,
+    Se3SpaceMouse,
+    Se3SpaceMouseCfg,
+)
 from isaaclab.devices.openxr import remove_camera_configs
 from isaaclab.devices.teleop_device_factory import create_teleop_device
 from isaaclab.envs import ManagerBasedRLEnvCfg
@@ -67,7 +88,9 @@ logger = logging.getLogger(__name__)
 
 def main() -> None:
     env_cfg = parse_env_cfg(
-        args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs,
+        args_cli.task,
+        device=args_cli.device,
+        num_envs=args_cli.num_envs,
         use_fabric=not args_cli.disable_fabric,
     )
     env_cfg.env_name = args_cli.task
@@ -79,7 +102,9 @@ def main() -> None:
     # env_cfg.terminations.time_out = None  # disabled: causes simulation view crash with some robots
     if "Lift" in args_cli.task:
         env_cfg.commands.object_pose.resampling_time_range = (1.0e9, 1.0e9)
-        env_cfg.terminations.object_reached_goal = DoneTerm(func=mdp.object_reached_goal)
+        env_cfg.terminations.object_reached_goal = DoneTerm(
+            func=mdp.object_reached_goal
+        )
 
     if args_cli.xr:
         env_cfg = remove_camera_configs(env_cfg)
@@ -127,9 +152,14 @@ def main() -> None:
 
     teleop_interface = None
     try:
-        if hasattr(env_cfg, "teleop_devices") and args_cli.teleop_device in env_cfg.teleop_devices.devices:
+        if (
+            hasattr(env_cfg, "teleop_devices")
+            and args_cli.teleop_device in env_cfg.teleop_devices.devices
+        ):
             teleop_interface = create_teleop_device(
-                args_cli.teleop_device, env_cfg.teleop_devices.devices, teleoperation_callbacks
+                args_cli.teleop_device,
+                env_cfg.teleop_devices.devices,
+                teleoperation_callbacks,
             )
         else:
             logger.warning(
@@ -138,15 +168,24 @@ def main() -> None:
             sensitivity = args_cli.sensitivity
             if args_cli.teleop_device.lower() == "keyboard":
                 teleop_interface = Se3Keyboard(
-                    Se3KeyboardCfg(pos_sensitivity=0.05 * sensitivity, rot_sensitivity=0.05 * sensitivity)
+                    Se3KeyboardCfg(
+                        pos_sensitivity=0.05 * sensitivity,
+                        rot_sensitivity=0.05 * sensitivity,
+                    )
                 )
             elif args_cli.teleop_device.lower() == "spacemouse":
                 teleop_interface = Se3SpaceMouse(
-                    Se3SpaceMouseCfg(pos_sensitivity=0.05 * sensitivity, rot_sensitivity=0.05 * sensitivity)
+                    Se3SpaceMouseCfg(
+                        pos_sensitivity=0.05 * sensitivity,
+                        rot_sensitivity=0.05 * sensitivity,
+                    )
                 )
             elif args_cli.teleop_device.lower() == "gamepad":
                 teleop_interface = Se3Gamepad(
-                    Se3GamepadCfg(pos_sensitivity=0.1 * sensitivity, rot_sensitivity=0.1 * sensitivity)
+                    Se3GamepadCfg(
+                        pos_sensitivity=0.1 * sensitivity,
+                        rot_sensitivity=0.1 * sensitivity,
+                    )
                 )
             else:
                 logger.error(f"Unsupported teleop device: {args_cli.teleop_device}")
@@ -187,7 +226,7 @@ def main() -> None:
                 if teleoperation_active:
                     actions = action.repeat(env.num_envs, 1)
                     env.step(actions)
-                    #########Debug prints for sensors 
+                    #########Debug prints for sensors
 
                     step_count += 1
                     if step_count % 120 == 0:
@@ -196,7 +235,7 @@ def main() -> None:
                         print(f"\n[step {step_count}] Joint positions:")
                         for name, pos in zip(joint_names, joint_pos):
                             print(f"  {name}: {pos.item():.5f}")
-                    ###################################################################               
+                    ###################################################################
                 else:
                     env.sim.render()
 

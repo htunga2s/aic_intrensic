@@ -36,7 +36,11 @@ from isaaclab.envs import ManagerBasedEnv
 from isaaclab.assets import RigidObjectCfg
 
 from . import mdp
-from .mdp.events import randomize_dome_light, reset_asset_base_position, randomize_board_and_parts
+from .mdp.events import (
+    randomize_dome_light,
+    reset_asset_base_position,
+    randomize_board_and_parts,
+)
 import isaaclab.envs.mdp as isaaclab_mdp
 
 # Resolve asset directory relative to this file (portable across machines)
@@ -52,7 +56,6 @@ EXTENSION_PATH = os.path.dirname(os.path.abspath(__file__))
 ##
 
 
-
 @configclass
 class IntrinsicTaskSceneCfg(InteractiveSceneCfg):
     """Scene for intrinsic task: UR5e robot, aic_scene, task_board."""
@@ -61,9 +64,11 @@ class IntrinsicTaskSceneCfg(InteractiveSceneCfg):
     robot: ArticulationCfg = ArticulationCfg(
         prim_path="{ENV_REGEX_NS}/Robot",
         spawn=sim_utils.UsdFileCfg(
-            usd_path=os.path.join(INTRINSIC_ASSET_DIR, "jointsTuned_robot_cable_0227.usd"),
+            usd_path=os.path.join(
+                INTRINSIC_ASSET_DIR, "jointsTuned_robot_cable_0227.usd"
+            ),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(
-                #disable_gravity=True,
+                # disable_gravity=True,
                 max_depenetration_velocity=5.0,
             ),
             articulation_props=sim_utils.ArticulationRootPropertiesCfg(
@@ -88,15 +93,22 @@ class IntrinsicTaskSceneCfg(InteractiveSceneCfg):
         actuators={
             "arm": ImplicitActuatorCfg(
                 joint_names_expr=[
-                    "shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
-                    "wrist_1_joint", "wrist_2_joint", "wrist_3_joint",
+                    "shoulder_pan_joint",
+                    "shoulder_lift_joint",
+                    "elbow_joint",
+                    "wrist_1_joint",
+                    "wrist_2_joint",
+                    "wrist_3_joint",
                 ],
                 effort_limit_sim=87.0,
                 stiffness=2000.0,
                 damping=100.0,
             ),
             "gripper": ImplicitActuatorCfg(
-                joint_names_expr=["gripper_left_finger_joint", "gripper_right_finger_joint"],
+                joint_names_expr=[
+                    "gripper_left_finger_joint",
+                    "gripper_right_finger_joint",
+                ],
                 effort_limit_sim=20.0,
                 stiffness=800.0,
                 damping=40.0,
@@ -132,7 +144,7 @@ class IntrinsicTaskSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/aic_scene",
         spawn=sim_utils.UsdFileCfg(
             usd_path=os.path.join(INTRINSIC_SCENE_DIR, "scene", "aic.usd"),
-            #usd_path=f"/home/nvidia/Downloads/aic_world.usd",
+            # usd_path=f"/home/nvidia/Downloads/aic_world.usd",
         ),
         init_state=AssetBaseCfg.InitialStateCfg(
             pos=(0.0, 0.0, -1.15),
@@ -143,9 +155,11 @@ class IntrinsicTaskSceneCfg(InteractiveSceneCfg):
     task_board = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/task_board",
         spawn=sim_utils.UsdFileCfg(
-            usd_path=os.path.join(INTRINSIC_PARTS_DIR, "Task Board Base", "task_board_rigid.usd"),
-            #scale=(0.00001, 0.00001, 0.00001),
-            #scale=(0.008, 0.008, 0.008),
+            usd_path=os.path.join(
+                INTRINSIC_PARTS_DIR, "Task Board Base", "task_board_rigid.usd"
+            ),
+            # scale=(0.00001, 0.00001, 0.00001),
+            # scale=(0.008, 0.008, 0.008),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(
                 kinematic_enabled=True,
             ),
@@ -160,7 +174,7 @@ class IntrinsicTaskSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/sc_port",
         spawn=sim_utils.UsdFileCfg(
             usd_path=os.path.join(INTRINSIC_PARTS_DIR, "SC Port", "sc_port.usd"),
-            #scale=(0.005, 0.005, 0.005),
+            # scale=(0.005, 0.005, 0.005),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(
                 kinematic_enabled=True,
             ),
@@ -175,7 +189,7 @@ class IntrinsicTaskSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/sc_port_2",
         spawn=sim_utils.UsdFileCfg(
             usd_path=os.path.join(INTRINSIC_PARTS_DIR, "SC Port", "sc_port.usd"),
-            #scale=(0.005, 0.005, 0.005),
+            # scale=(0.005, 0.005, 0.005),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(
                 kinematic_enabled=True,
             ),
@@ -190,14 +204,14 @@ class IntrinsicTaskSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/nic_card",
         spawn=sim_utils.UsdFileCfg(
             usd_path=os.path.join(INTRINSIC_PARTS_DIR, "NIC Card", "nic_card.usd"),
-            #scale=(0.009, 0.009, 0.009),
+            # scale=(0.009, 0.009, 0.009),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(
                 kinematic_enabled=True,
             ),
         ),
         init_state=RigidObjectCfg.InitialStateCfg(
             pos=(0.11385, 0.05108, 0.0743),
-            #rot=(0.0, 0.0, 1.0, 0.0),
+            # rot=(0.0, 0.0, 1.0, 0.0),
         ),
     )
 
@@ -213,8 +227,6 @@ class IntrinsicTaskSceneCfg(InteractiveSceneCfg):
     #     ),
     # )
 
-    
-
     def __post_init__(self):
         super().__post_init__()
 
@@ -229,25 +241,37 @@ class IntrinsicTaskSceneCfg(InteractiveSceneCfg):
         self.center_camera = TiledCameraCfg(
             prim_path="{ENV_REGEX_NS}/Robot/aic_unified_robot/center_camera_optical/Camera",
             spawn=_cam_spawn,
-            height=224, width=224, data_types=["rgb"],
+            height=224,
+            width=224,
+            data_types=["rgb"],
             offset=TiledCameraCfg.OffsetCfg(
-                pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0), convention="ros",
+                pos=(0.0, 0.0, 0.0),
+                rot=(1.0, 0.0, 0.0, 0.0),
+                convention="ros",
             ),
         )
         self.left_camera = TiledCameraCfg(
             prim_path="{ENV_REGEX_NS}/Robot/aic_unified_robot/left_camera_optical/Camera",
             spawn=_cam_spawn,
-            height=224, width=224, data_types=["rgb"],
+            height=224,
+            width=224,
+            data_types=["rgb"],
             offset=TiledCameraCfg.OffsetCfg(
-                pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0), convention="ros",
+                pos=(0.0, 0.0, 0.0),
+                rot=(1.0, 0.0, 0.0, 0.0),
+                convention="ros",
             ),
         )
         self.right_camera = TiledCameraCfg(
             prim_path="{ENV_REGEX_NS}/Robot/aic_unified_robot/right_camera_optical/Camera",
             spawn=_cam_spawn,
-            height=224, width=224, data_types=["rgb"],
+            height=224,
+            width=224,
+            data_types=["rgb"],
             offset=TiledCameraCfg.OffsetCfg(
-                pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0), convention="ros",
+                pos=(0.0, 0.0, 0.0),
+                rot=(1.0, 0.0, 0.0, 0.0),
+                convention="ros",
             ),
         )
 
@@ -284,10 +308,6 @@ class ActionsCfg:
     arm_action: ActionTerm = MISSING
     gripper_action: ActionTerm | None = None
 
-
-
-
-    
 
 @configclass
 class EventCfg:
@@ -370,8 +390,12 @@ class ObservationsCfg:
         """Observations for policy: joint state, ee pose, pose command."""
 
         # Robot state (joint space)
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
+        joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01)
+        )
+        joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.01, n_max=0.01)
+        )
         # End-effector pose in env frame (pos xyz + quat wxyz = 7 dims)
         eef_pose = ObsTerm(
             func=mdp.body_pose_w,
@@ -379,7 +403,9 @@ class ObservationsCfg:
             noise=Unoise(n_min=-0.001, n_max=0.001),
         )
         # Command (target ee pose)
-        pose_command = ObsTerm(func=mdp.generated_commands, params={"command_name": "ee_pose"})
+        pose_command = ObsTerm(
+            func=mdp.generated_commands, params={"command_name": "ee_pose"}
+        )
 
         # Body forces
         body_forces = ObsTerm(
@@ -387,23 +413,43 @@ class ObservationsCfg:
             scale=0.1,
             params={
                 "asset_cfg": SceneEntityCfg(
-                    "robot", body_names=["base_link", "shoulder_link", "upper_arm_link", \
-                        "forearm_link", "wrist_1_link", "wrist_2_link", "wrist_3_link"]
+                    "robot",
+                    body_names=[
+                        "base_link",
+                        "shoulder_link",
+                        "upper_arm_link",
+                        "forearm_link",
+                        "wrist_1_link",
+                        "wrist_2_link",
+                        "wrist_3_link",
+                    ],
                 )
             },
         )
 
         center_rgb = ObsTerm(
             func=mdp.image_features,
-            params={"sensor_cfg": SceneEntityCfg("center_camera"), "data_type": "rgb", "model_name": "resnet18"},
+            params={
+                "sensor_cfg": SceneEntityCfg("center_camera"),
+                "data_type": "rgb",
+                "model_name": "resnet18",
+            },
         )
         left_rgb = ObsTerm(
             func=mdp.image_features,
-            params={"sensor_cfg": SceneEntityCfg("left_camera"), "data_type": "rgb", "model_name": "resnet18"},
+            params={
+                "sensor_cfg": SceneEntityCfg("left_camera"),
+                "data_type": "rgb",
+                "model_name": "resnet18",
+            },
         )
         right_rgb = ObsTerm(
             func=mdp.image_features,
-            params={"sensor_cfg": SceneEntityCfg("right_camera"), "data_type": "rgb", "model_name": "resnet18"},
+            params={
+                "sensor_cfg": SceneEntityCfg("right_camera"),
+                "data_type": "rgb",
+                "model_name": "resnet18",
+            },
         )
 
         # Last action
@@ -425,32 +471,50 @@ class RewardsCfg:
     end_effector_position_tracking = RewTerm(
         func=mdp.position_command_error,
         weight=-0.2,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "command_name": "ee_pose"},
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=MISSING),
+            "command_name": "ee_pose",
+        },
     )
     # -- Position tracking (fine): tanh kernel provides dense signal near target --
     end_effector_position_tracking_fine_grained = RewTerm(
         func=mdp.position_command_error_tanh,
         weight=0.1,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "std": 0.1, "command_name": "ee_pose"},
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=MISSING),
+            "std": 0.1,
+            "command_name": "ee_pose",
+        },
     )
     # -- Position tracking (exponential): sharp bonus at very close range for insertion --
     end_effector_position_tracking_exp = RewTerm(
         func=mdp.position_command_error_exp,
         weight=0.3,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "sigma": 0.05, "command_name": "ee_pose"},
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=MISSING),
+            "sigma": 0.05,
+            "command_name": "ee_pose",
+        },
     )
 
     # -- Orientation tracking (coarse): angular-distance penalty --
     end_effector_orientation_tracking = RewTerm(
         func=mdp.orientation_command_error,
         weight=-0.1,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "command_name": "ee_pose"},
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=MISSING),
+            "command_name": "ee_pose",
+        },
     )
     # -- Orientation tracking (fine): tanh kernel for precise alignment --
     end_effector_orientation_tracking_fine_grained = RewTerm(
         func=mdp.orientation_command_error_tanh,
         weight=0.05,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "std": 0.25, "command_name": "ee_pose"},
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=MISSING),
+            "std": 0.25,
+            "command_name": "ee_pose",
+        },
     )
 
     # -- Sparse reaching bonus: +1 when EE is within 2 cm of the target --
@@ -518,16 +582,26 @@ class IntrinsicTaskEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.render_interval = self.decimation
         self.episode_length_s = 15.0
         self.sim.dt = 1.0 / 120.0
-        #self.sim.gravity = (0.0, 0.0, 3)
+        # self.sim.gravity = (0.0, 0.0, 3)
         self.viewer.eye = (8.0, 0.0, 5.0)
 
         # Override reward/command body to UR end-effector
         ee_body = ["wrist_3_link"]
-        self.rewards.end_effector_position_tracking.params["asset_cfg"].body_names = ee_body
-        self.rewards.end_effector_position_tracking_fine_grained.params["asset_cfg"].body_names = ee_body
-        self.rewards.end_effector_position_tracking_exp.params["asset_cfg"].body_names = ee_body
-        self.rewards.end_effector_orientation_tracking.params["asset_cfg"].body_names = ee_body
-        self.rewards.end_effector_orientation_tracking_fine_grained.params["asset_cfg"].body_names = ee_body
+        self.rewards.end_effector_position_tracking.params["asset_cfg"].body_names = (
+            ee_body
+        )
+        self.rewards.end_effector_position_tracking_fine_grained.params[
+            "asset_cfg"
+        ].body_names = ee_body
+        self.rewards.end_effector_position_tracking_exp.params[
+            "asset_cfg"
+        ].body_names = ee_body
+        self.rewards.end_effector_orientation_tracking.params[
+            "asset_cfg"
+        ].body_names = ee_body
+        self.rewards.end_effector_orientation_tracking_fine_grained.params[
+            "asset_cfg"
+        ].body_names = ee_body
         self.rewards.reaching_bonus.params["asset_cfg"].body_names = ee_body
 
         # # Arm action: joint position control
@@ -539,8 +613,12 @@ class IntrinsicTaskEnvCfg(ManagerBasedRLEnvCfg):
         self.actions.arm_action = DifferentialInverseKinematicsActionCfg(
             asset_name="robot",
             joint_names=[
-                "shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
-                "wrist_1_joint", "wrist_2_joint", "wrist_3_joint",
+                "shoulder_pan_joint",
+                "shoulder_lift_joint",
+                "elbow_joint",
+                "wrist_1_joint",
+                "wrist_2_joint",
+                "wrist_3_joint",
             ],
             body_name="wrist_3_link",
             controller=DifferentialIKControllerCfg(
@@ -573,4 +651,3 @@ class IntrinsicTaskEnvCfg(ManagerBasedRLEnvCfg):
                 ),
             },
         )
-
