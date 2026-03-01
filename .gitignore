@@ -9,4 +9,4 @@ files.txt
 !.pixi/config.toml
 
 # isaaclab assets
-aic_utils/aic_isaac/assets/
+aic_utils/aic_isaac/intrinsic_aic_isaaclab/source/intrinsic_task/intrinsic_task/tasks/manager_based/intrinsic_task/Intrinsic_assets/
