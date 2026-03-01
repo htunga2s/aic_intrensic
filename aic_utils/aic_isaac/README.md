@@ -126,11 +126,25 @@ isaaclab -p aic/aic_utils/aic_isaac/intrinsic_aic_isaaclab/scripts/list_envs.py
 ```
 
 ### Teleoperation and Imitation Learning
-Teleoperate the robot in AIC world with keyboard:
+Teleoperate the robot with keyboard:
 ```bash
 isaaclab -p aic/aic_utils/aic_isaac/intrinsic_aic_isaaclab/scripts/teleop.py \
     --task Intrinsic-AIC-Task-v0 --num_envs 1 --teleop_device keyboard --enable_cameras
 ```
+
+For data collection:
+```bash
+isaaclab -p aic/aic_utils/aic_isaac/intrinsic_aic_isaaclab/scripts/record_demos.py \
+    --task Intrinsic-AIC-Task-v0 --teleop_device keyboard --enable_cameras \
+    --dataset_file ./datasets/dataset.hdf5 --num_demos 10
+```
+
+To replay collected episodes:
+```bash
+isaaclab -p aic/aic_utils/aic_isaac/intrinsic_aic_isaaclab/scripts/replay_demos.py \
+    --dataset_file ./datasets/dataset.hdf5
+```
+
 
 > [!NOTE]
 > Users will have to connect the external environment with Isaac Lab for recording teleoperated data.
@@ -197,7 +211,9 @@ cd ~/IsaacLab
 ./docker/container.py enter base
 ```
 
-When using the NVIDIA-prepared assets, you only need to start and enter the container; when using aic_converter, complete steps 1–4 above first.
+> [!NOTE]
+> This asset generation pipeline is provided to allow participants explore different implementation. Manual tweaking of these assets is required (e.g. add colliders, update stiffness/damping values).
+
 
 
 ### Directory Structure
