@@ -12,20 +12,21 @@ common workflows in robotics research (such as reinforcement learning, learning 
 - Perform teleoperation in AIC environment for Imitation Learning
 - Use Reinforcement Learning with rsl-rl library for training policy
 
-Optionally, you can convert Gazebo SDF worlds to Isaac Lab USD format using the **aic_converter** (see [Optional: Generating assets with aic_converter](#optional-generating-assets-with-aic_converter)); this path requires additional setup and is intended for advanced use.
+Optionally, you can convert Gazebo SDF worlds to Isaac Lab USD format using the **aic_converter** (see [Optional: Generating assets with aic_converter](#optional-generating-assets-with-aic_converter)); this path requires additional setup including manual tweaking of USD files and is intended for advanced use.
 
 
 ## Workflow
 
-> [!NOTE]
-> The following integration is testing with docker containers.
+
+> [!TIP]
+> If you run into issues that appear to be related to **Isaac Lab** (e.g. framework behavior, Docker setup, or Isaac Lab APIs), please open an issue on the [Isaac Lab GitHub repository](https://github.com/isaac-sim/IsaacLab). The maintainers there are best placed to help. For issues specific to the AIC integration or challenge assets, use this repo’s issue tracker.
 
 **Recommended:** Use the assets prepared by the NVIDIA team. Download and place them as instructed, then start the container and run the task.
 
 | Step | What you do | Section |
 |------|-------------|---------|
-| 1 | Install Docker (and optionally NVIDIA Container Toolkit) | [Prerequisites](#prerequisites) |
-| 2 | Clone and build Isaac Lab, then clone the AIC repo into `ws_aic/src` | [Installation & Setup](#installation--setup) |
+| 1 | Install Docker and NVIDIA Container Toolkit | [Prerequisites](#prerequisites) |
+| 2 | Clone and build Isaac Lab, then clone the AIC repo into `IsaacLab` | [Installation & Setup](#installation--setup) |
 | 3 | Download the NVIDIA-prepared assets and place them in `Intrinsic_assets` | [Assets](#assets) |
 | 4 | Start the Isaac Lab container and enter it | [Assets](#assets) |
 | 5 | Run teleoperation or reinforcement learning from inside the container | [Usage](#usage) |
@@ -51,43 +52,34 @@ Optionally, you can convert Gazebo SDF worlds to Isaac Lab USD format using the 
     ```
 
 
-## Installation & Setup
+## Setup 
 
 > [!NOTE]
 > All commands in this section are to be executed on your **host machine** (not inside Docker).
 
-### Install Isaac Lab
+> [!WARNING]
+> The integration is testing with Isaac Lab version *2.3.2*.
 
-Clone the Isaac Lab repository (*version 2.3.2*):
+Clone the Isaac Lab repository in your home directory:
 ```bash
 cd ~
 git clone git@github.com:isaac-sim/IsaacLab.git
 ```
 
-Build the `base` profile (this creates the `isaac-lab-base` Docker image):
+Clone the AIC repository inside `IsaacLab` directory:
 ```bash
-cd IsaacLab
-./docker/container.py build base
-```
-
-### AIC Repo
-
-Create the workspace directory and clone the AIC repository into `ws_aic/src`:
-
-```bash
-mkdir -p ~/IsaacLab/ws_aic/src
-cd ~/IsaacLab/ws_aic/src
+cd ~IsaacLab
 git clone git@github.com:intrinsic-dev/aic.git
 ```
 
 ## Assets
 
-The **NVIDIA team has prepared the assets** needed for the challenge. Download the provided asset pack, extract it, and place the files as follows.
+The **NVIDIA team has prepared the assets** needed for the challenge. [Download the provided asset pack](), extract it, and place the files as follows.
 
-Place the assets in `Intrinsic_assets` directory:
+Place the `Intrinsic_assets` directory inside `intrinsic_task`:
 
-```
-~/IsaacLab/ws_aic/src/aic/aic_utils/aic_isaac/intrinsic_aic_isaaclab/source/intrinsic_task/intrinsic_task/tasks/manager_based/intrinsic_task/Intrinsic_assets
+```bash
+~/IsaacLab/aic/aic_utils/aic_isaac/intrinsic_aic_isaaclab/source/intrinsic_task/intrinsic_task/tasks/manager_based/intrinsic_task/
 ```
 
 **Files to place there** (from the downloaded pack):
@@ -100,19 +92,32 @@ Place the assets in `Intrinsic_assets` directory:
 
 If the asset pack includes world, enclosure, or robot USDs and separate placement instructions, follow those. Otherwise the prepared pack is self-contained.
 
-**Start the container and enter it** (from the Isaac Lab repo):
 
+## Installation
+
+Build the `base` profile (this creates the `isaac-lab-base` Docker image):
+```bash
+cd ~IsaacLab
+./docker/container.py build base
+```
+
+Start the container and attach shell to it (from the Isaac Lab repo):
 ```bash
 cd ~/IsaacLab
 ./docker/container.py start base
 ./docker/container.py enter base
 ```
 
+Install `intrinsic_task` in the Isaac Lab container with edit mode:
+```
+ python -m pip install -e aic/aic_utils/aic_isaac/intrinsic_aic_isaaclab/source/intrinsic_task
+ ```
+
 
 ## Usage
 
 > [!NOTE]
-> The following commands are to be executed **inside the Isaac Lab container** (after starting and entering it.
+> The following commands are to be executed **inside the Isaac Lab container** after starting and entering it.
 
 ### Environment and Sensor Reading
 

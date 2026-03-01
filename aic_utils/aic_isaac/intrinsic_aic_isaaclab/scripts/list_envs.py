@@ -54,7 +54,7 @@ def main():
     index = 0
     # acquire all Isaac environments names
     for task_spec in gym.registry.values():
-        if "Template-" in task_spec.id and (
+        if "Intrinsic-" in task_spec.id and (
             args_cli.keyword is None or args_cli.keyword in task_spec.id
         ):
             # add details to table

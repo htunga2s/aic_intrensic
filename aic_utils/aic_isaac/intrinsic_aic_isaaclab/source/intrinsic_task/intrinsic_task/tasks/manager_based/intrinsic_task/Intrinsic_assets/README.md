@@ -1,1 +1,0 @@
-# Intrinsic AIC Assets
