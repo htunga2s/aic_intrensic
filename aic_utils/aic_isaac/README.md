@@ -74,7 +74,7 @@ git clone git@github.com:intrinsic-dev/aic.git
 
 ## Assets
 
-The **NVIDIA team has prepared the assets** needed for the challenge. [Download the provided asset pack](), extract it, and place the files as follows.
+The **NVIDIA team has prepared the assets** needed for the challenge. [Download the provided asset pack](https://developer.nvidia.com/downloads/Omniverse/learning/Events/Hackathons/Intrinsic_assets.zip), extract it, and place the files as follows.
 
 Place the `Intrinsic_assets` directory inside `intrinsic_task`:
 
@@ -214,7 +214,12 @@ cd ~/IsaacLab
 > [!NOTE]
 > This asset generation pipeline is provided to allow participants explore different implementation. Manual tweaking of these assets is required (e.g. add colliders, update stiffness/damping values).
 
-
+Isaac Sim Documentation on Tuning and Importing Assets:
+- [Tutorial: Import URDF](https://docs.isaacsim.omniverse.nvidia.com/4.5.0/robot_setup/import_urdf.html)
+- [Tuning Joint Drive Gains](https://docs.isaacsim.omniverse.nvidia.com/4.5.0/robot_setup/joint_tuning.html)
+- [Gain Tuner Extension](https://docs.isaacsim.omniverse.nvidia.com/4.5.0/robot_setup/ext_isaacsim_robot_setup_gain_tuner.html)
+- [Physics Inspector](https://docs.isaacsim.omniverse.nvidia.com/4.5.0/physics/joint_inspector.html)
+- [Simulation Data Visualizer](https://docs.isaacsim.omniverse.nvidia.com/4.5.0/physics/ext_isaacsim_inspect_physics.html)
 
 ### Directory Structure
 
