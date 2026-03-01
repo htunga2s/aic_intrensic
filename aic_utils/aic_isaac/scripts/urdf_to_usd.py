@@ -1,77 +1,155 @@
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# All rights reserved.
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+"""
+Utility to convert a URDF into USD format.
+
+Unified Robot Description Format (URDF) is an XML file format used in ROS to describe all elements of
+a robot. For more information, see: http://wiki.ros.org/urdf
+
+This script uses the URDF importer extension from Isaac Sim (``isaacsim.asset.importer.urdf``) to convert a
+URDF asset into USD format. It is designed as a convenience script for command-line use. For more
+information on the URDF importer, see the documentation for the extension:
+https://docs.isaacsim.omniverse.nvidia.com/latest/robot_setup/ext_isaacsim_asset_importer_urdf.html
+
+
+positional arguments:
+  input               The path to the input URDF file.
+  output              The path to store the USD file.
+
+optional arguments:
+  -h, --help                Show this help message and exit
+  --merge-joints            Consolidate links that are connected by fixed joints. (default: False)
+  --fix-base                Fix the base to where it is imported. (default: False)
+  --joint-stiffness         The stiffness of the joint drive. (default: 100.0)
+  --joint-damping           The damping of the joint drive. (default: 1.0)
+  --joint-target-type       The type of control to use for the joint drive. (default: "position")
+
+"""
+
+"""Launch Isaac Sim Simulator first."""
+
 import argparse
+
+from isaaclab.app import AppLauncher
+
+# add argparse arguments
+parser = argparse.ArgumentParser(
+    description="Utility to convert a URDF into USD format."
+)
+parser.add_argument("input", type=str, help="The path to the input URDF file.")
+parser.add_argument("output", type=str, help="The path to store the USD file.")
+parser.add_argument(
+    "--joint-stiffness",
+    type=float,
+    default=100.0,
+    help="The stiffness of the joint drive.",
+)
+parser.add_argument(
+    "--joint-damping",
+    type=float,
+    default=1.0,
+    help="The damping of the joint drive.",
+)
+
+# append AppLauncher cli args
+AppLauncher.add_app_launcher_args(parser)
+# parse the arguments
+args_cli = parser.parse_args()
+
+# launch omniverse app
+app_launcher = AppLauncher(args_cli)
+simulation_app = app_launcher.app
+
+"""Rest everything follows."""
+
+import contextlib
 import os
-from isaacsim import SimulationApp
 
-# 1. Setup Argument Parsing BEFORE starting SimulationApp
-parser = argparse.ArgumentParser(description="URDF to USD Converter for Isaac Sim")
-parser.add_argument(
-    "--input", type=str, required=True, help="Path to the input URDF file"
-)
-parser.add_argument(
-    "--output", type=str, required=True, help="Path where the USD file will be saved"
-)
-args = parser.parse_args()
+import carb
+import omni.kit.app
 
-# 2. Initialize SimulationApp
-# Headless is set to True as this is a conversion utility
-kit = SimulationApp({"renderer": "RaytracedLighting", "headless": True})
-
-import omni.kit.commands
-import omni.usd
-from isaacsim.core.prims import Articulation
-from pxr import Gf, PhysicsSchemaTools, PhysxSchema, Sdf, UsdPhysics
+import isaaclab.sim as sim_utils
+from isaaclab.sim.converters import UrdfConverter, UrdfConverterCfg
+from isaaclab.utils.assets import check_file_path
+from isaaclab.utils.dict import print_dict
 
 
 def main():
-    # Verify input file exists
-    if not os.path.exists(args.input):
-        print(f"Error: Input file {args.input} does not exist.")
-        kit.close()
-        return
+    # check valid file path
+    urdf_path = args_cli.input
+    if not os.path.isabs(urdf_path):
+        urdf_path = os.path.abspath(urdf_path)
+    if not check_file_path(urdf_path):
+        raise ValueError(f"Invalid file path: {urdf_path}")
+    # create destination path
+    dest_path = args_cli.output
+    if not os.path.isabs(dest_path):
+        dest_path = os.path.abspath(dest_path)
 
-    # Setting up import configuration
-    status, import_config = omni.kit.commands.execute("URDFCreateImportConfig")
-    import_config.merge_fixed_joints = False
-    import_config.convex_decomp = True
-    import_config.import_inertia_tensor = True
-    import_config.fix_base = True
-    import_config.distance_scale = 1.0
-
-    # Import URDF
-    print(f"Importing: {args.input}")
-    status, prim_path = omni.kit.commands.execute(
-        "URDFParseAndImportFile",
-        urdf_path=args.input,
-        import_config=import_config,
-        get_articulation_root=True,
+    # Create Urdf converter config
+    urdf_converter_cfg = UrdfConverterCfg(
+        asset_path=urdf_path,
+        usd_dir=os.path.dirname(dest_path),
+        usd_file_name=os.path.basename(dest_path),
+        fix_base=True,
+        merge_fixed_joints=False,
+        force_usd_conversion=True,
+        joint_drive=UrdfConverterCfg.JointDriveCfg(
+            gains=UrdfConverterCfg.JointDriveCfg.PDGainsCfg(
+                stiffness=None,
+                damping=None,
+            ),
+            drive_type="force",
+            target_type="position",
+        ),
+        collision_from_visuals=False,
+        collider_type="convex_decomposition",
+        self_collision=True,
     )
 
-    if not status:
-        print("Failed to import URDF.")
-        kit.close()
-        return
+    # Print info
+    print("-" * 80)
+    print("-" * 80)
+    print(f"Input URDF file: {urdf_path}")
+    print("URDF importer config:")
+    print_dict(urdf_converter_cfg.to_dict(), nesting=0)
+    print("-" * 80)
+    print("-" * 80)
 
-    # Get stage handle
-    stage = omni.usd.get_context().get_stage()
+    # Create Urdf converter and import the file
+    urdf_converter = UrdfConverter(urdf_converter_cfg)
+    # print output
+    print("URDF importer output:")
+    print(f"Generated USD file: {urdf_converter.usd_path}")
+    print("-" * 80)
+    print("-" * 80)
 
-    # Enable physics and scene setup
-    scene = UsdPhysics.Scene.Define(stage, Sdf.Path("/physicsScene"))
-    scene.CreateGravityDirectionAttr().Set(Gf.Vec3f(0.0, 0.0, -1.0))
-    scene.CreateGravityMagnitudeAttr().Set(9.81)
+    # Determine if there is a GUI to update:
+    # acquire settings interface
+    carb_settings_iface = carb.settings.get_settings()
+    # read flag for whether a local GUI is enabled
+    local_gui = carb_settings_iface.get("/app/window/enabled")
+    # read flag for whether livestreaming GUI is enabled
+    livestream_gui = carb_settings_iface.get("/app/livestream/enabled")
 
-    PhysxSchema.PhysxSceneAPI.Apply(stage.GetPrimAtPath("/physicsScene"))
-    physxSceneAPI = PhysxSchema.PhysxSceneAPI.Get(stage, "/physicsScene")
-    physxSceneAPI.CreateEnableCCDAttr(True)
-    physxSceneAPI.CreateEnableStabilizationAttr(True)
-    physxSceneAPI.CreateBroadphaseTypeAttr("MBP")
-    physxSceneAPI.CreateSolverTypeAttr("TGS")
-
-    # 3. Save the Stage
-    print(f"Saving USD to: {args.output}")
-    omni.usd.get_context().save_as_stage(args.output)
-
-    kit.close()
+    # Simulate scene (if not headless)
+    if local_gui or livestream_gui:
+        # Open the stage with USD
+        sim_utils.open_stage(urdf_converter.usd_path)
+        # Reinitialize the simulation
+        app = omni.kit.app.get_app_interface()
+        # Run simulation
+        with contextlib.suppress(KeyboardInterrupt):
+            while app.is_running():
+                # perform step
+                app.update()
 
 
 if __name__ == "__main__":
+    # run the main function
     main()
+    # close sim app
+    simulation_app.close()

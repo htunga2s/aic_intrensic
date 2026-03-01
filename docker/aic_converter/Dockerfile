@@ -131,7 +131,7 @@ RUN  source /ws_aic/install/setup.bash && \
   /ws_aic/gz-usd/build/bin/sdf2usd ./assets/staging/SDFs/aic_world.sdf ./assets/staging/USDs/aic_world.usd && \
   /ws_aic/gz-usd/build/bin/sdf2usd ./assets/staging/SDFs/aic_enclosure.sdf ./assets/staging/USDs/aic_enclosure.usd 
 
-# Convert USDs to USDAs
+# Convert USDs to USDAs for debugging
 RUN  mkdir -p ./assets/staging/USDAs && \
   /ws_aic/OpenUSD/bin/usdcat ./assets/staging/USDs/aic_world.usd -o ./assets/staging/USDAs/aic_world.usda && \
   /ws_aic/OpenUSD/bin/usdcat ./assets/staging/USDs/aic_enclosure.usd -o ./assets/staging/USDAs/aic_enclosure.usda  && \
@@ -140,14 +140,15 @@ RUN  mkdir -p ./assets/staging/USDAs && \
   /ws_aic/OpenUSD/bin/usdcat ./assets/staging/USDs/light_visual.usd -o ./assets/staging/USDAs/light_visual.usda  && \
   /ws_aic/OpenUSD/bin/usdcat ./assets/staging/USDs/enclosure_visual.usd -o ./assets/staging/USDAs/enclosure_visual.usda  
 
-# Apply USDA injector
+# Apply USDA injector 
 RUN python3 ./scripts/patch_usda.py ./assets/staging/USDAs/aic_world.usda ./config/aic_world.yaml ./assets/aic_world.usda && \
   python3 ./scripts/patch_usda.py ./assets/staging/USDAs/aic_enclosure.usda ./config/aic_enclosure.yaml ./assets/aic_enclosure.usda
 
 # Generate Robot URDF
 RUN mkdir -p ./assets/staging/URDFs && \
   source /ws_aic/install/setup.bash && \
-  ros2 run xacro xacro /ws_aic/src/aic/aic_description/urdf/ur_gz.urdf.xacro -o ./assets/staging/URDFs/aic_robot_raw.urdf name:=ur
+  ros2 run xacro xacro /ws_aic/src/aic/aic_description/urdf/ur_gz.urdf.xacro -o ./assets/staging/URDFs/aic_robot_raw.urdf \
+  name:=ur safety_limits:=false safety_pos_margin:=0.15 safety_k_position:=20
 
 # Apply filter rules to URDF
 RUN python3 ./scripts/filter_urdf.py ./assets/staging/URDFs/aic_robot_raw.urdf ./config/aic_robot.yaml ./assets/staging/URDFs/aic_robot.urdf
@@ -163,17 +164,22 @@ WORKDIR /workspace/isaaclab
 
 RUN apt-get update && apt-get install -y rename && \
     cd /ws_aic/src/aic/aic_assets/models && \
-    find . -depth -name "*[- ]*" -exec rename 's/[- ]/_/g' {} +
+    find . -depth -name "*[- ]*" | while read -r f; do \
+      dir=$(dirname "$f"); \
+      base=$(basename "$f"); \
+      newbase=$(echo "$base" | sed 's/[- ]/_/g'); \
+      [ "$base" != "$newbase" ] && mv -n "$f" "$dir/$newbase"; \
+    done
 
 RUN cd /ws_aic/src/aic/aic_utils/aic_isaac && \
-  /isaac-sim/python.sh ./scripts/urdf_2_usd.py --input ./assets/staging/URDFs/aic_robot.urdf --output ./assets/aic_robot.usd
+  /workspace/isaaclab/isaaclab.sh -p ./scripts/urdf_to_usd.py ./assets/staging/URDFs/aic_robot.urdf ./assets/aic_robot.usd --headless --device "cpu"
 
 
-# # --- STAGE 4: Final image ---
+# --- STAGE 4: Final image ---
 FROM aic_kilted AS export_assets
 
 # Copy assets from aic_urdf
-COPY --from=aic_urdf /ws_aic/src/aic/aic_utils/aic_isaac/assets/aic_robot.usd /ws_aic/src/aic/aic_utils/aic_isaac/assets/staging/USDs/aic_robot.usd
+COPY --from=aic_urdf /ws_aic/src/aic/aic_utils/aic_isaac/assets/aic_robot.usd /ws_aic/src/aic/aic_utils/aic_isaac/assets/aic_robot.usd
 
 # WORKDIR /ws_aic/src/aic/aic_utils/aic_isaac
 
