@@ -9,14 +9,28 @@ This package provides documentation, scripts, and utilities for setting up AI fo
 common workflows in robotics research (such as reinforcement learning, learning from demonstrations, and motion planning). In collaboration with 
 **NVIDIA**, this integration enables participants to:
 
-- Convert Gazebo SDF worlds to Isaac Lab USD format using `aic_converter`
-- Control the UR5e robot using Isaac Lab built-in teleoperation pipeline
-- Leverage domain randomization 
+- Perform teleoperation in AIC environment for Imitation Learning
+- Use Reinforcement Learning with rsl-rl library for training policy
+
+Optionally, you can convert Gazebo SDF worlds to Isaac Lab USD format using the **aic_converter** (see [Optional: Generating assets with aic_converter](#optional-generating-assets-with-aic_converter)); this path requires additional setup and is intended for advanced use.
 
 
-## Workflow Summary
+## Workflow
 
-1. **Generate AIC USD Assets**: Execute `aic_utils/aic_isaac/aic_converter.sh` script to generate AIC USD files.
+> [!NOTE]
+> The following integration is testing with docker containers.
+
+**Recommended:** Use the assets prepared by the NVIDIA team. Download and place them as instructed, then start the container and run the task.
+
+| Step | What you do | Section |
+|------|-------------|---------|
+| 1 | Install Docker (and optionally NVIDIA Container Toolkit) | [Prerequisites](#prerequisites) |
+| 2 | Clone and build Isaac Lab, then clone the AIC repo into `ws_aic/src` | [Installation & Setup](#installation--setup) |
+| 3 | Download the NVIDIA-prepared assets and place them in `Intrinsic_assets` | [Assets](#assets) |
+| 4 | Start the Isaac Lab container and enter it | [Assets](#assets) |
+| 5 | Run teleoperation or reinforcement learning from inside the container | [Usage](#usage) |
+
+**Optional (advanced):** If you need to generate or modify the world, enclosure, or robot USDs from Gazebo SDF yourself (e.g. for custom scenes), you can use the **aic_converter**. This path requires extra setup and work, see [Optional: Generating assets with aic_converter](#optional-generating-assets-with-aic_converter).
 
 
 ## Prerequisites
@@ -27,9 +41,6 @@ common workflows in robotics research (such as reinforcement learning, learning 
 2. Complete the [Linux post-installation steps for Docker Engine](https://docs.docker.com/engine/install/linux-postinstall/) to enable managing Docker as a non-root user.
 
 ### NVIDIA Container Toolkit (Optional)
-
-> [!NOTE]
-> This step is only required if you have an NVIDIA GPU and want to use GPU acceleration for optimal performance.
 
 1. Install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) to allow Docker Engine to access your NVIDIA GPU.
 
@@ -42,62 +53,97 @@ common workflows in robotics research (such as reinforcement learning, learning 
 
 ## Installation & Setup
 
-### Install Isaac lab
-Clone Isaac Lab repository (*version 2.3.2*):
+> [!NOTE]
+> All commands in this section are to be executed on your **host machine** (not inside Docker).
+
+### Install Isaac Lab
+
+Clone the Isaac Lab repository (*version 2.3.2*):
 ```bash
 cd ~
 git clone git@github.com:isaac-sim/IsaacLab.git
 ```
 
-Build ```base``` profile which will create ```isaac-lab-base``` docker image:
+Build the `base` profile (this creates the `isaac-lab-base` Docker image):
 ```bash
 cd IsaacLab
 ./docker/container.py build base
 ```
 
 ### AIC Repo
-In the Isaac Lab repository create ```ws_aic/src```:
+
+Create the workspace directory and clone the AIC repository into `ws_aic/src`:
+
 ```bash
 mkdir -p ~/IsaacLab/ws_aic/src
+cd ~/IsaacLab/ws_aic/src
+git clone git@github.com:intrinsic-dev/aic.git
 ```
 
-Clone AIC repository in the ```src``` directory:
+## Assets
+
+The **NVIDIA team has prepared the assets** needed for the challenge. Download the provided asset pack, extract it, and place the files as follows.
+
+Place the assets in `Intrinsic_assets` directory:
+
+```
+~/IsaacLab/ws_aic/src/aic/aic_utils/aic_isaac/intrinsic_aic_isaaclab/source/intrinsic_task/intrinsic_task/tasks/manager_based/intrinsic_task/Intrinsic_assets
+```
+
+**Files to place there** (from the downloaded pack):
+- `nic_card.usd`
+- `sc_port.usd`
+- `robot_cable.usd`
+- `aic.usd`
+- `Task_board_rigid.usd`
+- `cable.usd`
+
+If the asset pack includes world, enclosure, or robot USDs and separate placement instructions, follow those. Otherwise the prepared pack is self-contained.
+
+**Start the container and enter it** (from the Isaac Lab repo):
+
 ```bash
-cd ~/IsaacLab/ws_aic/src
-git clone git@github.com:intrinsic-dev/aic.git 
+cd ~/IsaacLab
+./docker/container.py start base
+./docker/container.py enter base
 ```
 
 
 ## Usage
 
-### Generate AIC USD Assets
+> [!NOTE]
+> The following commands are to be executed **inside the Isaac Lab container** (after starting and entering it.
 
-We have provided ```aic_usd_generator.sh``` utility script which builds **aic_converter** docker and exports
-**assets** directory containing following USDs at location ```~/IsaacLab/ws_aic/aic/src/aic_utils/aic_isaac/assets```:
-1. World USD File (```aic_world.usda```)
-2. Enclosure USD File (```aic_enclosure.usda```)
-3. Robot USD File (```aic_robot.usda```)
+### Environment and Sensor Reading
 
-Generate the USDs utilizing following:
+### Teleoperation and Imitation Learning
+To teleoperate the robot in AIC world with keyboard:
 ```bash
-cd ~/IsaacLab/ws_aic/src/aic
-./aic_utils/aic_isaac/aic_usd_generator.sh
+python3 scripts/teleop.py --task Intrinsic-AIC-Task-v0 --num_envs 1 --teleop_device keyboard --enable_cameras
 ```
 
-Start ```isaac-lab-base``` docker container:
+> [!NOTE]
+> Users will have to connect the external environment with Isaac Lab for recording teleoperated data.
+
+Additional resources:
+1. [Teleoperation using Keyboard, Spacemouse and XR]()
+2. [Recording Teleoperation data]()
+3. [Imitation Learning in Isaac Lab]()
+
+### Reinforcement Learning
+To run training using RL and rsl-rl library, follow these steps
+
+#### 1. Execute the Training Script
+Run the training script from your terminal using the following command:
 ```bash
-./docker/container.py start base
+python scripts/rsl_rl/train.py --task Intrinsic-AIC-Task-v0 --num_envs 1 --enable_cameras
 ```
 
-Copy assets directory inside Isaac Lab base container:
-```bash
-docker cp aic/aic_utils/aic_isaac/assets /workspace/isaaclab
-```
-
-Attach ```bash``` shell to ```isaac-lab-base``` docker container:
-```bash
-./docker/container.py enter base
-```
+Other Resources:
+1. [Gear Assembly Task]()
+2. [Creating a manager-based RL environment]()
+3. [Domain Randomization]
+4. Task Curation, VLA training and Policy Evaluation using Isaac Lab Arena
 
 
 ## Directory Structure
@@ -121,7 +167,7 @@ The integration is organized as follows:
 │   │   └── zenoh_router_config.json5
 ```
 
-Organization of assets directory generated by ```aic_converter```:
+Organization of the **assets** directory produced by `aic_usd_generator.sh` (aic_converter):
 ```
 └── assets
     ├── aic_enclosure.usda
@@ -182,6 +228,52 @@ The exported SDF undergoes a pipeline of transformations:
 - **URDF Generation**: The robot description is processed via xacro to generate a clean URDF file (aic_robot.urdf). 
 
 The final build artifacts are staged in ```aic/aic_utils/aic_isaac/assets/``` directory and copied to the host system.
+
+### Optional: Generating assets with aic_converter
+
+If you want to **generate or regenerate** the world, enclosure, or robot USDs from Gazebo SDF yourself (e.g. for custom scenes or tooling), you can use the **aic_converter**. This path is **optional** and **requires additional work** (Docker build, Gazebo pipeline, etc.). Most participants should use the [NVIDIA-prepared assets](#assets) above.
+
+The `aic_usd_generator.sh` script builds the **aic_converter** Docker image and produces an **assets** directory with:
+
+- World: `aic_world.usda`
+- Enclosure: `aic_enclosure.usda`
+- Robot: `aic_robot.usda`
+
+If you use this path:
+
+**Output location:** `~/IsaacLab/ws_aic/src/aic/aic_utils/aic_isaac/assets`
+
+**1. Generate the USDs** (on the host, from the AIC repo):
+
+```bash
+cd ~/IsaacLab/ws_aic/src/aic
+./aic_utils/aic_isaac/aic_usd_generator.sh
+```
+
+**2. Start the Isaac Lab container** (from the Isaac Lab repo):
+
+```bash
+cd ~/IsaacLab
+./docker/container.py start base
+```
+
+**3. Copy the assets into the container** (run from the Isaac Lab repo root, `~/IsaacLab`):
+
+```bash
+docker cp ws_aic/src/aic/aic_utils/aic_isaac/assets isaac-lab-base:/workspace/isaaclab
+```
+
+> [!TIP]
+> If the container has a different name, run `docker ps` and use the actual container name in place of `isaac-lab-base`.
+
+**4. Enter the container** to run teleoperation or training:
+
+```bash
+cd ~/IsaacLab
+./docker/container.py enter base
+```
+
+When using the NVIDIA-prepared assets, you only need to start and enter the container; when using aic_converter, complete steps 1–4 above first.
 
 
 ## Future Work
