@@ -190,7 +190,7 @@ docker cp ws_aic/src/aic/aic_utils/aic_isaac/assets isaac-lab-base:/workspace/is
 > [!TIP]
 > If the container has a different name, run `docker ps` and use the actual container name in place of `isaac-lab-base`.
 
-**4. Enter the container** to run teleoperation or training:
+**4. Enter the container** to load and test USDs:
 
 ```bash
 cd ~/IsaacLab
