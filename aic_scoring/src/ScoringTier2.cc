@@ -138,9 +138,10 @@ bool ScoringTier2::WaitForTfs() {
   // straightforward wait.
   const auto start = this->node->get_clock()->now();
   const auto timeout = std::chrono::seconds(10);
-  while ((!this->cableTfReceived || !this->gripperTfReceived) &&
+  while (rclcpp::ok() && (!this->cableTfReceived || !this->gripperTfReceived) &&
          this->node->get_clock()->now() - start < timeout) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    this->node->get_clock()->sleep_for(
+        rclcpp::Duration(std::chrono::milliseconds(100)));
   }
   if (!this->cableTfReceived || !this->gripperTfReceived) {
     RCLCPP_ERROR(this->node->get_logger(),
@@ -201,7 +202,7 @@ std::pair<Tier2Score, Tier3Score> ScoringTier2::ComputeScore() {
   // First pass: Process all messages to build the complete TF buffer.
   // We need both static TF (robot URDF) and dynamic TF (joint states) to
   // compute the full transform chain to the gripper.
-  while (bagReader.has_next()) {
+  while (rclcpp::ok() && bagReader.has_next()) {
     const auto msg_ptr = bagReader.read_next();
     // Debugging to make sure messages are in the bag
     // RCLCPP_INFO(this->node->get_logger(), "Received message on topic '%s'",
@@ -213,8 +214,7 @@ std::pair<Tier2Score, Tier3Score> ScoringTier2::ComputeScore() {
                msg_ptr->topic_name == kScoringTfTopic) {
       const auto msg = deserialize_from_rosbag<TFMsg>(msg_ptr);
       this->TfCallback(msg);
-    } else if (msg_ptr->topic_name == kTfStaticTopic ||
-               msg_ptr->topic_name == kScoringTfStaticTopic) {
+    } else if (msg_ptr->topic_name == kTfStaticTopic) {
       const auto msg = deserialize_from_rosbag<TFMsg>(msg_ptr);
       this->TfStaticCallback(msg);
     } else if (msg_ptr->topic_name == kContactsTopic) {
@@ -697,6 +697,11 @@ Tier3Score ScoringTier2::GetDistanceScore() const {
   //   initial plug-port distance.
   //   This score is always lower than a partial insertion score.
 
+  if (!this->task_start_time.has_value()) {
+    return Tier3Score(0,
+                      "Distance computation failed, task start time not set");
+  }
+
   // Being as close as possible to the port entrance will award
   // kClosestTaskScore
   const auto initDist = this->GetPlugPortDistance(tf2::TimePoint(
@@ -931,19 +936,19 @@ Tier2Score::CategoryScore ScoringTier2::GetTaskDurationScore(
   const double kFastestTaskScore = 12.0;
   const double kSlowestTaskScore = 0.0;
 
-  if (_tier3.total_score() <= 0) {
-    return CategoryScore(
-        0,
-        "Plug is not within max bounding radius from target port, "
-        "not assigning time bonus");
+  if (!this->task_end_time.has_value()) {
+    return CategoryScore(0, "Task not completed.");
   }
 
   if (!this->task_start_time.has_value()) {
     return CategoryScore(0, "Time computation failed, task start time not set");
   }
 
-  if (!this->task_end_time.has_value()) {
-    return CategoryScore(0, "Task not completed.");
+  if (_tier3.total_score() <= 0) {
+    return CategoryScore(
+        0,
+        "Plug is not within max bounding radius from target port, "
+        "not assigning time bonus");
   }
 
   const rclcpp::Duration task_duration =

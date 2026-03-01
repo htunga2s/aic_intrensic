@@ -8,5 +8,13 @@ files.txt
 .pixi/*
 !.pixi/config.toml
 
+<<<<<<< HEAD
 # isaaclab assets
 aic_utils/aic_isaac/intrinsic_aic_isaaclab/source/intrinsic_task/intrinsic_task/tasks/manager_based/intrinsic_task/Intrinsic_assets/
+=======
+# Ignore mesh/texture assets in aic_mujoco mjcf, keep only .xml
+aic_utils/aic_mujoco/mjcf/*.obj
+aic_utils/aic_mujoco/mjcf/*.stl
+aic_utils/aic_mujoco/mjcf/*.png
+
+>>>>>>> origin/main

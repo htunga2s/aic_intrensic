@@ -38,31 +38,20 @@ pixi run ros2 run aic_model aic_model --ros-args -p use_sim_time:=true -p policy
 
 ### 2. CheatCode - Ground Truth Policy
 
+![Cheat Code Policy](../../media/cheat_code_policy.gif)
+
 A "cheating" solution that uses the TF transformation tree provided by the simulation when `ground_truth:=true` is set at launch time. This policy uses the poses of the plug and port to calculate target poses to send to `aic_controller`.
 
 **Purpose:** Useful for training and debugging. Ground truth data will not be available during official evaluation.
 
-**Launch simulation with ground truth:**
+**Launch simulation *with ground truth*:**
 ```bash
-/entrypoint.sh \
-  nic_card_mount_0_present:=true \
-  sc_port_0_present:=true \
-  ground_truth:=true \
-  spawn_task_board:=true \
-  spawn_cable:=true \
-  attach_cable_to_gripper:=true \
-  sfp_mount_rail_0_present:=true \
-  start_aic_engine:=false
+/entrypoint.sh ground_truth:=true start_aic_engine:=true
 ```
 
 **Run the policy:**
 ```bash
 pixi run ros2 run aic_model aic_model --ros-args -p use_sim_time:=true -p policy:=aic_example_policies.ros.CheatCode
-```
-
-**Trigger task execution:**
-```bash
-src/aic/aic_model/test/create_and_cancel_task.py
 ```
 
 **Source:** [`CheatCode.py`](./aic_example_policies/ros/CheatCode.py)
@@ -71,7 +60,11 @@ src/aic/aic_model/test/create_and_cancel_task.py
 
 ### 3. RunACT - ACT Policy
 
-An implementation of a [LeRobot ACT](https://huggingface.co/docs/lerobot/en/act) (Action Chunking with Transformers) policy trained with a small dataset available on HuggingFace (TODO add link).
+![Run ACT Policy](../../media/run_act_policy.gif)
+
+A proof-of-concept implementation of a [LeRobot ACT](https://huggingface.co/docs/lerobot/en/act) (Action Chunking with Transformers) policy available on [HuggingFace](https://huggingface.co/grkw/aic_act_policy). This policy was trained on an NVIDIA RTX A5000 machine using `lerobot-train` with default parameters, on a small dataset collected using `lerobot-record` as explained in [`lerobot_robot_aic`](../aic_utils/lerobot_robot_aic/README.md#recording-training-data).
+
+You may need to modify `pixi.toml` in order to run `lerobot` with your hardware setup. See [Troubleshooting](../docs/troubleshooting.md#nvidia-rtx-50xx-cards-not-supported-on-pytorch-version-locked-in-pixi). 
 
 **Purpose:** Demonstrates integration of a trained neural network policy for the cable insertion task.
 
