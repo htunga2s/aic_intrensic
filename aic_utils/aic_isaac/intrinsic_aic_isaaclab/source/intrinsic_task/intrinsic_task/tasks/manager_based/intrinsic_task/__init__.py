@@ -13,7 +13,7 @@ from . import agents
 
 
 gym.register(
-    id="Template-Intrinsic-Task-v0",
+    id="Intrinsic-AIC-Task-v0",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
